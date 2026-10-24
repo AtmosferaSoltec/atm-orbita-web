@@ -49,5 +49,9 @@
 		"#lib": "./src/lib/index.js",
 		"#lib/*": "./src/lib/*"
 	},
-	"packageManager": "pnpm@11.20.0"
+	"packageManager": "pnpm@11.20.0",
+	"dependencies": {
+		"@internationalized/date": "^3.12.4",
+		"bits-ui": "^2.20.2"
+	}
 }

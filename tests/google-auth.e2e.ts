@@ -58,6 +58,8 @@ async function mockGoogle(
 			return ok({ tokens: { access_token: 'renewed-orbita-token' } });
 		}
 		if (path === '/me') return ok(user);
+		if (path === '/services')
+			return route.fulfill({ json: { data: [], meta: { today: '2026-10-24' } } });
 		if (path === '/currencies') return ok([{ code: 'PEN', symbol: 'S/', name: 'Soles' }]);
 		if (path === '/receipts/years') return ok({ years: [], current_year: 2026 });
 		if (path.startsWith('/receipt-limits/'))

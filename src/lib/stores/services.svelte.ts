@@ -1,77 +1,79 @@
-import { loadJson, newId, saveJson } from '#lib/data/storage.ts';
-import { seedServices } from '#lib/data/seed.ts';
+import * as remote from '#lib/api/services.ts';
 import type { MemberPayment, Service, ServiceDraft } from '#lib/domain/services.ts';
-import type { MonthKey } from '#lib/domain/dates.ts';
-
-const KEY = 'services';
+import { todayIso, type MonthKey } from '#lib/domain/dates.ts';
+import { messageFor } from '#lib/api/errors.ts';
 
 class ServicesStore {
-	items = $state<Service[]>(loadJson(KEY, seedServices));
+	items = $state<Service[]>([]);
+	today = $state(todayIso());
+	loaded = $state(false);
+	loading = $state(false);
+	error = $state<string | null>(null);
+	#pending: Promise<void> | null = null;
+	#generation = 0;
 
 	get(id: string): Service | undefined {
 		return this.items.find((s) => s.id === id);
 	}
-
-	add(draft: ServiceDraft): Service {
-		const service: Service = {
-			...draft,
-			id: newId(),
-			memberPayments: [],
-			createdAt: new Date().toISOString()
-		};
-		this.items.push(service);
-		this.#save();
+	load(force = false): Promise<void> {
+		if (this.#pending) return this.#pending;
+		if (this.loaded && !force) return Promise.resolve();
+		const generation = this.#generation;
+		this.loading = true;
+		this.error = null;
+		this.#pending = (async () => {
+			try {
+				const data = await remote.listServices();
+				if (generation !== this.#generation) return;
+				this.items = data.items;
+				this.today = data.today;
+				this.loaded = true;
+			} catch (failure) {
+				if (generation === this.#generation) this.error = messageFor(failure);
+			} finally {
+				if (generation === this.#generation) {
+					this.loading = false;
+					this.#pending = null;
+				}
+			}
+		})();
+		return this.#pending;
+	}
+	async add(draft: ServiceDraft, id: string): Promise<Service> {
+		const generation = this.#generation;
+		const service = await remote.createService(id, draft);
+		this.#put(service, generation);
 		return service;
 	}
-
-	update(id: string, draft: ServiceDraft): void {
-		const index = this.items.findIndex((s) => s.id === id);
-		if (index < 0) return;
-		const current = this.items[index];
-		const memberIds = new Set(draft.members.map((m) => m.id));
-		this.items[index] = {
-			...current,
-			...draft,
-			// Payments of removed members go away with them.
-			memberPayments: current.memberPayments.filter((p) => memberIds.has(p.memberId))
-		};
-		this.#save();
+	async update(id: string, draft: ServiceDraft): Promise<void> {
+		const generation = this.#generation;
+		this.#put(await remote.updateService(id, draft), generation);
 	}
-
-	remove(id: string): void {
-		this.items = this.items.filter((s) => s.id !== id);
-		this.#save();
+	async remove(id: string): Promise<void> {
+		const generation = this.#generation;
+		await remote.deleteService(id);
+		if (generation === this.#generation) this.items = this.items.filter((s) => s.id !== id);
 	}
-
-	markPaid(serviceId: string, payments: Omit<MemberPayment, 'id'>[]): void {
-		const service = this.get(serviceId);
-		if (!service) return;
-		for (const payment of payments) {
-			const exists = service.memberPayments.some(
-				(p) => p.memberId === payment.memberId && p.month === payment.month
-			);
-			if (!exists) service.memberPayments.push({ ...payment, id: newId() });
-		}
-		this.#save();
+	async markPaid(id: string, payments: Omit<MemberPayment, 'id'>[]): Promise<void> {
+		const generation = this.#generation;
+		this.#put(await remote.markPaid(id, payments), generation);
 	}
-
-	unmarkPaid(serviceId: string, memberId: string, month: MonthKey): void {
-		const service = this.get(serviceId);
-		if (!service) return;
-		service.memberPayments = service.memberPayments.filter(
-			(p) => !(p.memberId === memberId && p.month === month)
-		);
-		this.#save();
+	async unmarkPaid(id: string, memberId: string, month: MonthKey): Promise<void> {
+		const generation = this.#generation;
+		this.#put(await remote.unmarkPaid(id, memberId, month), generation);
 	}
-
-	reset(): void {
-		this.items = seedServices();
-		this.#save();
+	clear(): void {
+		this.#generation++;
+		this.items = [];
+		this.today = todayIso();
+		this.loaded = false;
+		this.loading = false;
+		this.error = null;
+		this.#pending = null;
 	}
-
-	#save(): void {
-		saveJson(KEY, $state.snapshot(this.items));
+	#put(service: Service, generation: number): void {
+		if (generation !== this.#generation) return;
+		this.items = [...this.items.filter((s) => s.id !== service.id), service];
 	}
 }
-
 export const services = new ServicesStore();

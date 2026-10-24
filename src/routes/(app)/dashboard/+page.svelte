@@ -1,4 +1,5 @@
 <script lang="ts">
+	import ServicesStatus from '#lib/components/services/ServicesStatus.svelte';
 	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
 	import {
@@ -57,10 +58,15 @@
 	}
 
 	const today = todayIso();
-	// Receipts are real (API); loans and services are still mockups in this browser.
+	const serviceToday = $derived(services.today);
+	// Receipts and services come from the API; loans are still demo data.
 	const year = $derived(receipts.currentYear);
 	const receiptItems = $derived(receipts.itemsOf(year) ?? []);
 	const receiptsLoaded = $derived(receipts.itemsOf(year) !== undefined);
+
+	onMount(() => {
+		void services.load();
+	});
 
 	onMount(async () => {
 		try {
@@ -98,7 +104,9 @@
 		loanSummaries.filter(({ summary }) => summary.status !== 'completed').length
 	);
 	const owed = $derived(
-		byCurrency(services.items.map((s) => ({ currency: s.currency, amount: owedToMe(s, today) })))
+		byCurrency(
+			services.items.map((s) => ({ currency: s.currency, amount: owedToMe(s, serviceToday) }))
+		)
 	);
 
 	const alerts = $derived.by(() => {
@@ -131,7 +139,7 @@
 			}
 		}
 		for (const service of services.items) {
-			for (const status of membersStatus(service, today)) {
+			for (const status of membersStatus(service, serviceToday)) {
 				if (!status.owedMonths.length) continue;
 				list.push({
 					key: `member-${service.id}-${status.member.id}`,
@@ -145,7 +153,7 @@
 				});
 			}
 		}
-		for (const charge of upcomingCharges(services.items, today)) {
+		for (const charge of upcomingCharges(services.items, serviceToday)) {
 			list.push({
 				key: `charge-${charge.service.id}`,
 				icon: CalendarClock,
@@ -259,6 +267,7 @@
 	</p>
 </header>
 
+<ServicesStatus />
 <div class="grid gap-5 lg:grid-cols-[1.25fr_1fr]">
 	<a
 		href={resolve('/(app)/receipts')}
@@ -288,11 +297,17 @@
 			icon={Repeat}
 			tone="orange"
 			label="Servicios al mes"
-			value={byCurrency([
-				{ currency: 'PEN', amount: serviceTotals.PEN.mine },
-				{ currency: 'USD', amount: serviceTotals.USD.mine }
-			])}
-			hint="Tu parte. Te deben {owed} de servicios compartidos."
+			value={services.loaded
+				? byCurrency([
+						{ currency: 'PEN', amount: serviceTotals.PEN.mine },
+						{ currency: 'USD', amount: serviceTotals.USD.mine }
+					])
+				: '—'}
+			hint={services.loaded
+				? `Tu parte. Te deben ${owed} de servicios compartidos.`
+				: services.error
+					? 'No se pudieron cargar tus servicios.'
+					: 'Cargando tus servicios…'}
 			href={resolve('/(app)/services')}
 		/>
 	</div>

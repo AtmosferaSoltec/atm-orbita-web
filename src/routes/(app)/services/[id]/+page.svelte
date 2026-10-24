@@ -1,4 +1,6 @@
 <script lang="ts">
+	import ServicesStatus from '#lib/components/services/ServicesStatus.svelte';
+	import { messageFor } from '#lib/api/errors.ts';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
@@ -17,7 +19,7 @@
 	import ServiceIcon from '#lib/components/services/ServiceIcon.svelte';
 	import { SERVICE_STATUS } from '#lib/components/services/labels.ts';
 	import { formatMoney } from '#lib/domain/money.ts';
-	import { formatDate, formatMonth, relativeDays, todayIso } from '#lib/domain/dates.ts';
+	import { formatDate, formatMonth, relativeDays } from '#lib/domain/dates.ts';
 	import {
 		chargeDates,
 		lastChargeDate,
@@ -31,7 +33,7 @@
 	import { services } from '#lib/stores/services.svelte.ts';
 	import { toasts } from '#lib/stores/toasts.svelte.ts';
 
-	const today = todayIso();
+	const today = $derived(services.today);
 	const service = $derived(services.get(page.params.id ?? ''));
 	const members = $derived(service ? membersStatus(service, today) : []);
 	const next = $derived(service ? nextChargeDate(service, today) : null);
@@ -48,36 +50,45 @@
 		paying = true;
 	}
 
-	function toggleMonth(status: MemberStatus, month: MemberMonth) {
+	async function toggleMonth(status: MemberStatus, month: MemberMonth) {
 		if (!service) return;
 		if (month.status === 'paid') {
 			undoTarget = { status, month };
 			confirmUndo = true;
 		} else if (month.status === 'owed') {
-			services.markPaid(service.id, [
-				{
-					memberId: status.member.id,
-					month: month.month,
-					paidOn: today,
-					amount: status.member.amount
-				}
-			]);
-			toasts.success(`${status.member.name}: ${formatMonth(month.month).toLowerCase()} pagado.`);
+			try {
+				await services.markPaid(service.id, [
+					{
+						memberId: status.member.id,
+						month: month.month,
+						paidOn: today,
+						amount: status.member.amount
+					}
+				]);
+				toasts.success(`${status.member.name}: ${formatMonth(month.month).toLowerCase()} pagado.`);
+			} catch (failure) {
+				toasts.error(messageFor(failure));
+			}
 		}
 	}
 
 	async function remove() {
 		if (!service) return;
-		services.remove(service.id);
-		toasts.success('Servicio eliminado.');
-		await goto(resolve('/(app)/services'), { replaceState: true });
+		try {
+			await services.remove(service.id);
+			toasts.success('Servicio eliminado.');
+			await goto(resolve('/(app)/services'), { replaceState: true });
+		} catch (failure) {
+			toasts.error(messageFor(failure));
+		}
 	}
 </script>
 
 <svelte:head><title>Servicio · Orbita</title></svelte:head>
 
+<ServicesStatus />
 {#if service}
-	<PageHeader title={service.name} subtitle={service.category} back={resolve('/(app)/services')}>
+	<PageHeader title={service.name} subtitle="Suscripción mensual" back={resolve('/(app)/services')}>
 		{#snippet actions()}
 			<IconButton
 				icon={Trash2}
@@ -204,12 +215,17 @@
 			? `${undoTarget.status.member.name} · ${formatMonth(undoTarget.month.month)}`
 			: ''}
 		confirmLabel="Deshacer pago"
-		onconfirm={() => {
-			if (undoTarget)
-				services.unmarkPaid(service.id, undoTarget.status.member.id, undoTarget.month.month);
+		onconfirm={async () => {
+			if (!undoTarget) return;
+			try {
+				await services.unmarkPaid(service.id, undoTarget.status.member.id, undoTarget.month.month);
+				toasts.success('Pago deshecho.');
+			} catch (failure) {
+				toasts.error(messageFor(failure));
+			}
 		}}
 	/>
-{:else}
+{:else if !services.error && services.loaded}
 	<Card>
 		<EmptyState icon={FileQuestion} tone="neutral" title="Este registro ya no existe.">
 			{#snippet action()}<Button href={resolve('/(app)/services')}>Volver a servicios</Button

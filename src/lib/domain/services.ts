@@ -8,6 +8,7 @@ import {
 	dateInMonth,
 	monthRange,
 	toMonthKey,
+	isIsoDate,
 	todayIso,
 	type IsoDate,
 	type MonthKey
@@ -37,7 +38,6 @@ export interface MemberPayment {
 export interface Service {
 	id: string;
 	name: string;
-	category: string;
 	color: string;
 	currency: Currency;
 	amount: Cents;
@@ -84,16 +84,6 @@ export const SERVICE_COLORS = [
 	'#E53935',
 	'#0E1A2B',
 	'#64748B'
-];
-
-export const SERVICE_CATEGORIES = [
-	'Software',
-	'Inteligencia artificial',
-	'Entretenimiento',
-	'Música',
-	'Nube y hosting',
-	'Hogar',
-	'Otros'
 ];
 
 /** The month the service stops being charged, or the current month while it is active. */
@@ -143,14 +133,22 @@ export function memberStatus(
 	const byMonth = new Map(payments.map((p) => [p.month, p]));
 	const until = lastChargedMonth(service, today);
 
-	const months = monthRange(member.since, until).map((month): MemberMonth => {
-		const dueDate = dateInMonth(month, service.billingDay);
-		const payment = byMonth.get(month) ?? null;
-		let status: MonthStatus = 'upcoming';
-		if (payment) status = 'paid';
-		else if (dueDate <= today && service.status !== 'paused') status = 'owed';
-		return { month, dueDate, status, payment };
-	});
+	const months = monthRange(member.since, until)
+		.filter((month) => {
+			const due = dateInMonth(month, service.billingDay);
+			return (
+				due >= service.startedOn &&
+				!(service.status === 'cancelled' && service.endedOn && due > service.endedOn)
+			);
+		})
+		.map((month): MemberMonth => {
+			const dueDate = dateInMonth(month, service.billingDay);
+			const payment = byMonth.get(month) ?? null;
+			let status: MonthStatus = 'upcoming';
+			if (payment) status = 'paid';
+			else if (dueDate <= today && service.status !== 'paused') status = 'owed';
+			return { month, dueDate, status, payment };
+		});
 
 	const owedMonths = months.filter((m) => m.status === 'owed').map((m) => m.month);
 	const lastPayment = [...payments].sort((a, b) => b.month.localeCompare(a.month))[0] ?? null;
@@ -211,8 +209,14 @@ export function validateService(draft: ServiceDraft): string | null {
 	if (!draft.name.trim()) return 'Escribe un nombre.';
 	if (draft.name.length > 60) return 'El nombre puede tener hasta 60 caracteres.';
 	if (draft.amount <= 0) return 'Escribe un monto mayor que cero.';
-	if (draft.billingDay < 1 || draft.billingDay > 31) return 'Elige un día de cobro entre 1 y 31.';
-	if (!draft.startedOn) return 'Elige la fecha en que empezaste a pagarlo.';
+	if (!Number.isInteger(draft.billingDay) || draft.billingDay < 1 || draft.billingDay > 31)
+		return 'Elige un día de cobro entre 1 y 31.';
+	if (
+		!isIsoDate(draft.startedOn) ||
+		draft.startedOn < '2000-01-01' ||
+		draft.startedOn > '2100-12-31'
+	)
+		return 'Elige una fecha de inicio válida.';
 	if (draft.status === 'cancelled' && !draft.endedOn) return 'Elige la fecha en que lo cancelaste.';
 	if (draft.endedOn && draft.endedOn < draft.startedOn)
 		return 'La fecha de cancelación no puede ser anterior al inicio.';
@@ -223,6 +227,13 @@ export function validateService(draft: ServiceDraft): string | null {
 			return 'Cada persona debe pagar un monto mayor que cero.';
 		if (myShare(draft) < 0) return 'Lo que pagan los demás no puede superar el costo del servicio.';
 	}
+	if (draft.members.some((m) => m.name.length > 60))
+		return 'El nombre de cada persona puede tener hasta 60 caracteres.';
+	if (
+		draft.shared &&
+		draft.members.some((m) => !isIsoDate(m.since + '-01') || m.since < toMonthKey(draft.startedOn))
+	)
+		return 'Cada persona debe empezar a pagar desde el mes de inicio del servicio o después.';
 	if (draft.note.length > 500) return 'El texto puede tener hasta 500 caracteres.';
 	return null;
 }

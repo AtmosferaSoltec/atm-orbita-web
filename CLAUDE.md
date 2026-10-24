@@ -14,10 +14,11 @@ Plus: landing (`/`), login, register, forgot password (3 steps, like Android) an
 | --------------------------------- | --------------------------------------------------------------------------------------------------------- |
 | Login, register, forgot password  | **Real**, against `atm-orbita-api` (the same accounts as the Android app; plans 01, 11 and 17 of the API) |
 | Receipts (`/receipts`)            | **Real**: data in the API's database, XML and PDF in Cloudflare R2 (API plan 18)                          |
-| Loans, services, public loan link | Still **mockups** on sample data in `localStorage` (`src/lib/data/seed.ts`)                               |
-| Dashboard                         | Receipts real; loans and services from the mockups                                                        |
+| Loans, services, public loan link | Loans/public loan links are **mockups** in localStorage; services are **real**, against the API (plan 20) |
+| Dashboard                         | Receipts and services real; loans from the mockups                                                        |
 
 - **Session:** the access token lives only in memory (`src/lib/api/client.ts`); the refresh token is an `HttpOnly`, `SameSite=Strict` cookie that JavaScript never sees (header `X-Session-Transport: cookie`, API plan 17). On load, the app renews the session and asks `/me` (`session.ensureReady()`); a 401 renews once and retries. New web sessions use 90-day renewable refresh tokens (API `WEB_REFRESH_TOKEN_TTL_DAYS`); existing/native sessions keep their policy. Web Locks serialize cookie rotations across tabs.
+- **Services:** real API persistence for subscriptions, members and monthly reimbursement payments (API plan 20). No categories or automatic equal split. Currency uses an animated radio switch and is locked after payments exist. Day/date controls use Bits UI popovers/calendar; date-only values use `@internationalized/date`. The store clears on session loss and uses the profile-local date from API metadata. Removing members/sharing also removes their payments. Historical payment amounts stay fixed.
 - **Files:** uploaded through the API (it checks them), downloaded with short-lived signed R2 URLs, and shown inside the page through `…/documents/:kind/content` (the R2 key cannot set CORS on the bucket; see API plan 18, deviations).
 - **Google sign-in:** login/register use Google Identity Services when the API returns a configured client ID from `/auth/google/config` (API plan 19). Google credentials stay in memory. An existing password account confirms its password once to link. The API supplies all provider configuration; no frontend `.env` or build arguments. Live account testing requires the owner’s OAuth web client ID. See `../atm-orbita-api/docs/plans/19-google-sign-in.md` for setup and deployment.
 - **Register asks for a name** (optional in the API, so Android keeps working without it).
@@ -52,8 +53,8 @@ Vite proxies `/api` to the API (`API_PROXY_TARGET`, default `http://localhost:30
 ```
 src/lib/api/          API client (client.ts: tokens, renewal, errors), auth.ts, receipts.ts; errors.ts maps codes to Spanish.
 src/lib/domain/       Pure rules (TS, no Svelte): money, dates, receipts, loans, services, rhe-xml. With tests (*.spec.ts).
-src/lib/data/         Mockup persistence (storage.ts) and sample data for loans and services (seed.ts).
-src/lib/stores/       State with runes (*.svelte.ts). session and receipts talk to the API; loans and services are mockups.
+src/lib/data/         Mockup persistence (storage.ts) and sample data for loans (seed.ts).
+src/lib/stores/       State with runes (*.svelte.ts). session, receipts and services talk to the API; loans are mockups.
 src/lib/components/
   ui/                 Reusable design-system components (Button, Card, TextField, Modal, HeroCard…).
   layout/             AppShell (sidebar on desktop, bottom bar on mobile), UserMenu, FloatingCards.
@@ -104,6 +105,6 @@ pnpm check        # types (svelte-check)
 pnpm lint         # prettier + eslint
 pnpm format       # format
 npx vitest run --project server   # domain tests
-pnpm exec playwright test         # Google and session flows (mock provider/API)
+pnpm exec playwright test         # Google (mock) and services (real local API/server DB)
 pnpm build        # static build in build/
 ```

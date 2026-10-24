@@ -1,2 +1,6 @@
 allowBuilds:
   esbuild: true
+
+# Bits UI's date/popover helpers use runed; 0.38 declares SvelteKit 3 support.
+overrides:
+  runed: 0.38.0

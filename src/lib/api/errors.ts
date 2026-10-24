@@ -20,6 +20,7 @@ export class ApiError extends Error {
 export const NETWORK_ERROR = 'NETWORK';
 
 const MESSAGES: Record<string, string> = {
+	SERVICE_CURRENCY_LOCKED: 'La moneda no se puede cambiar mientras existan pagos registrados.',
 	GOOGLE_UNAVAILABLE: 'El acceso con Google no está disponible en este momento.',
 	GOOGLE_INVALID: 'No pudimos verificar tu cuenta de Google. Vuelve a continuar con Google.',
 	GOOGLE_CHALLENGE_EXPIRED: 'El intento de acceso venció. Vuelve a continuar con Google.',
@@ -45,6 +46,24 @@ const MESSAGES: Record<string, string> = {
 };
 
 const FIELD_MESSAGES: Record<string, string> = {
+	SERVICE_NAME_REQUIRED: 'Escribe un nombre para el servicio.',
+	SERVICE_COLOR_INVALID: 'Elige un color para el servicio.',
+	BILLING_DAY_INVALID: 'Elige un día de cobro entre 1 y 31.',
+	SERVICE_DATE_INVALID: 'Elige una fecha de inicio válida.',
+	SERVICE_STATUS_INVALID: 'Elige un estado válido.',
+	SERVICE_END_INVALID: 'Elige una fecha de último cobro igual o posterior al inicio.',
+	SERVICE_MEMBERS_REQUIRED: 'Agrega entre 1 y 100 personas con quienes lo compartes.',
+	SERVICE_MEMBER_INVALID: 'Revisa las personas del servicio e inténtalo de nuevo.',
+	SERVICE_MEMBER_NAME_INVALID: 'Escribe un nombre de hasta 60 caracteres para cada persona.',
+	SERVICE_MEMBER_MONTH_INVALID:
+		'Cada persona debe empezar a pagar desde el mes de inicio del servicio o después.',
+	SERVICE_SHARES_EXCEED_TOTAL: 'Lo que pagan los demás no puede superar el costo del servicio.',
+	SERVICE_NOTE_TOO_LONG: 'La nota puede tener hasta 500 caracteres.',
+	SERVICE_PAYMENT_MONTH_INVALID:
+		'Solo puedes registrar meses que correspondan al servicio y ya se hayan cobrado.',
+	SERVICE_PAYMENT_DATE_INVALID: 'Elige una fecha de pago entre el inicio del servicio y hoy.',
+	SERVICE_PAYMENTS_REQUIRED: 'Selecciona al menos un mes para registrar el pago.',
+
 	EMAIL_INVALID: 'Escribe un correo válido.',
 	PASSWORD_TOO_SHORT: 'La contraseña debe tener al menos 8 caracteres.',
 	PASSWORD_TOO_LONG: 'La contraseña puede tener hasta 128 caracteres.',

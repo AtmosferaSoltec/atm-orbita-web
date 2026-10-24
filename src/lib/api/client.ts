@@ -130,3 +130,9 @@ export async function apiBlob(path: string): Promise<Blob> {
 	const res = await request(path);
 	return res.blob();
 }
+
+/** List endpoints may include server metadata, such as the profile-local date. */
+export async function apiWithMeta<T, M>(path: string): Promise<{ data: T; meta: M }> {
+	const res = await request(path);
+	return (await res.json()) as { data: T; meta: M };
+}

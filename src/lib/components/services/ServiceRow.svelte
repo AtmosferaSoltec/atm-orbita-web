@@ -5,12 +5,13 @@
 	import ServiceIcon from './ServiceIcon.svelte';
 	import { SERVICE_STATUS } from './labels';
 	import { formatMoney } from '#lib/domain/money.ts';
-	import { formatDate, relativeDays, todayIso } from '#lib/domain/dates.ts';
+	import { formatDate, relativeDays } from '#lib/domain/dates.ts';
+	import { services } from '#lib/stores/services.svelte.ts';
 	import { nextChargeDate, owedToMe, type Service } from '#lib/domain/services.ts';
 
 	let { service }: { service: Service } = $props();
 
-	const today = todayIso();
+	const today = $derived(services.today);
 	const next = $derived(nextChargeDate(service, today));
 	const owed = $derived(owedToMe(service, today));
 </script>
@@ -33,7 +34,7 @@
 			{#if service.status === 'active' && next}
 				Próximo cobro {relativeDays(next, today)} · {formatDate(next)}
 			{:else}
-				{service.category}
+				{SERVICE_STATUS[service.status].label}
 			{/if}
 		</p>
 	</div>

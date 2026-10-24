@@ -1,4 +1,5 @@
 <script lang="ts">
+	import ServicesStatus from '#lib/components/services/ServicesStatus.svelte';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
@@ -13,6 +14,7 @@
 
 <svelte:head><title>Editar servicio · Orbita</title></svelte:head>
 
+<ServicesStatus />
 {#if service}
 	<PageHeader
 		title="Editar servicio"
@@ -24,13 +26,13 @@
 			initial={service}
 			submitLabel="Guardar cambios"
 			onsubmit={async (draft) => {
-				services.update(service.id, draft);
+				await services.update(service.id, draft);
 				toasts.success('Cambios guardados.');
 				await goto(resolve('/(app)/services/[id]', { id: service.id }), { replaceState: true });
 			}}
 		/>
 	{/key}
-{:else}
+{:else if !services.error && services.loaded}
 	<Card>
 		<EmptyState icon={FileQuestion} tone="neutral" title="Este registro ya no existe.">
 			{#snippet action()}<Button href={resolve('/(app)/services')}>Volver a servicios</Button

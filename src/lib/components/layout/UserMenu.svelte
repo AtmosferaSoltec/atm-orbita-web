@@ -80,7 +80,7 @@
 <ConfirmDialog
 	bind:open={confirmReset}
 	title="¿Restablecer los datos de ejemplo?"
-	text="Se perderán los préstamos y servicios que agregaste o cambiaste en la maqueta. Tus recibos no se tocan: esos ya son reales."
+	text="Se restablecerán los préstamos de ejemplo. Tus recibos y servicios guardados seguirán disponibles."
 	confirmLabel="Restablecer"
 	onconfirm={() => {
 		resetDemoData();

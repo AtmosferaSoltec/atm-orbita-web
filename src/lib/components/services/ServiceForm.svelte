@@ -1,29 +1,25 @@
 <script lang="ts">
+	import CurrencySwitch from '#lib/components/ui/CurrencySwitch.svelte';
+	import BillingDayPicker from '#lib/components/ui/BillingDayPicker.svelte';
+	import DatePicker from '#lib/components/ui/DatePicker.svelte';
+	import { messageFor } from '#lib/api/errors.ts';
 	import { untrack } from 'svelte';
-	import { CalendarDays, Check, Plus, Trash2, Type, User } from '@lucide/svelte';
+	import { Check, Plus, Trash2, Type, User } from '@lucide/svelte';
 	import {
 		Button,
 		Card,
 		IconButton,
 		MoneyField,
 		MonthField,
-		SegmentedControl,
 		SelectField,
 		SwitchRow,
 		TextAreaField,
 		TextField
 	} from '#lib/components/ui/index.ts';
 	import ServiceIcon from './ServiceIcon.svelte';
+	import { formatMoney, parseAmount, toInputValue, type Currency } from '#lib/domain/money.ts';
+	import { toMonthKey, type MonthKey } from '#lib/domain/dates.ts';
 	import {
-		formatMoney,
-		parseAmount,
-		splitEvenly,
-		toInputValue,
-		type Currency
-	} from '#lib/domain/money.ts';
-	import { toMonthKey, todayIso, type MonthKey } from '#lib/domain/dates.ts';
-	import {
-		SERVICE_CATEGORIES,
 		SERVICE_COLORS,
 		myShare,
 		validateService,
@@ -31,13 +27,14 @@
 		type ServiceDraft,
 		type ServiceStatus
 	} from '#lib/domain/services.ts';
+	import { services } from '#lib/stores/services.svelte.ts';
 	import { newId } from '#lib/data/storage.ts';
 	import { toasts } from '#lib/stores/toasts.svelte.ts';
 
 	interface Props {
 		initial?: Service;
 		submitLabel: string;
-		onsubmit: (draft: ServiceDraft) => void;
+		onsubmit: (draft: ServiceDraft) => Promise<void>;
 	}
 
 	let { initial, submitLabel, onsubmit }: Props = $props();
@@ -50,14 +47,14 @@
 	}
 
 	const start = untrack(() => initial);
-	const today = todayIso();
+	const today = untrack(() => services.today);
+	let saving = $state(false);
 
 	let name = $state(start?.name ?? '');
-	let category = $state(start?.category ?? SERVICE_CATEGORIES[0]);
 	let color = $state(start?.color ?? SERVICE_COLORS[0]);
 	let currency = $state<Currency>(start?.currency ?? 'PEN');
 	let amountText = $state(toInputValue(start?.amount));
-	let billingDay = $state(String(start?.billingDay ?? Number(today.slice(8, 10))));
+	let billingDay = $state(start?.billingDay ?? Number(today.slice(8, 10)));
 	let startedOn = $state(start?.startedOn ?? today);
 	let status = $state<ServiceStatus>(start?.status ?? 'active');
 	let endedOn = $state(start?.endedOn ?? today);
@@ -79,24 +76,23 @@
 	const mine = $derived(myShare({ amount, shared, members: parsedMembers }));
 
 	function addMember() {
-		members.push({ id: newId(), name: '', amount: '', since: toMonthKey(today) });
+		members.push({
+			id: newId(),
+			name: '',
+			amount: '',
+			since: toMonthKey(startedOn > today ? startedOn : today)
+		});
 	}
 
-	/** Everyone pays the same, me included; I absorb the rounding. */
-	function splitEqually() {
-		const shares = splitEvenly(amount, members.length + 1);
-		members.forEach((m, i) => (m.amount = toInputValue(shares[members.length - i])));
-	}
-
-	function submit(event: SubmitEvent) {
+	async function submit(event: SubmitEvent) {
 		event.preventDefault();
+		if (saving) return;
 		const draft: ServiceDraft = {
 			name: name.trim(),
-			category,
 			color,
 			currency,
 			amount,
-			billingDay: Number(billingDay),
+			billingDay,
 			startedOn,
 			status,
 			endedOn: status === 'cancelled' ? endedOn : null,
@@ -109,7 +105,14 @@
 			toasts.error(error);
 			return;
 		}
-		onsubmit(draft);
+		saving = true;
+		try {
+			await onsubmit(draft);
+		} catch (failure) {
+			toasts.error(messageFor(failure));
+		} finally {
+			saving = false;
+		}
 	}
 </script>
 
@@ -117,18 +120,13 @@
 	<div class="flex flex-col gap-6">
 		<Card padding="lg">
 			<h2 class="text-base font-extrabold">Servicio</h2>
-			<div class="mt-4 grid gap-4 sm:grid-cols-2">
+			<div class="mt-4">
 				<TextField
 					label="Nombre"
 					bind:value={name}
 					icon={Type}
 					placeholder="Netflix, GitHub, Claude…"
 					maxlength={60}
-				/>
-				<SelectField
-					label="Categoría"
-					bind:value={category}
-					options={SERVICE_CATEGORIES.map((c) => ({ value: c, label: c }))}
 				/>
 			</div>
 			<fieldset class="mt-4">
@@ -159,31 +157,18 @@
 			<div class="mt-4 flex flex-col gap-4">
 				<div>
 					<p class="mb-1.5 text-[13px] font-bold text-neutral">Moneda</p>
-					<SegmentedControl
-						label="Moneda"
+					<CurrencySwitch
 						bind:value={currency}
-						options={[
-							{ value: 'PEN', label: 'S/ Soles' },
-							{ value: 'USD', label: 'US$ Dólares' }
-						]}
+						disabled={Boolean(initial?.memberPayments.length)}
 					/>
+					{#if initial?.memberPayments.length}<p class="mt-2 text-xs text-muted">
+							La moneda se conserva porque ya hay pagos registrados.
+						</p>{/if}
 				</div>
 				<div class="grid gap-4 sm:grid-cols-2">
 					<MoneyField label="Monto mensual" bind:value={amountText} {currency} />
-					<SelectField
-						label="Día de cobro"
-						bind:value={billingDay}
-						options={Array.from({ length: 31 }, (_, i) => ({
-							value: String(i + 1),
-							label: `Día ${i + 1}`
-						}))}
-					/>
-					<TextField
-						label="Empecé a pagarlo el"
-						type="date"
-						bind:value={startedOn}
-						icon={CalendarDays}
-					/>
+					<BillingDayPicker bind:value={billingDay} />
+					<DatePicker label="Empecé a pagarlo el" bind:value={startedOn} />
 					<SelectField
 						label="Estado"
 						bind:value={status}
@@ -194,11 +179,10 @@
 						]}
 					/>
 					{#if status === 'cancelled'}
-						<TextField
+						<DatePicker
 							label="Último cobro"
-							type="date"
 							bind:value={endedOn}
-							icon={CalendarDays}
+							min={startedOn}
 							class="sm:col-span-2"
 						/>
 					{/if}
@@ -212,6 +196,11 @@
 				label="Lo comparto con otras personas"
 				description="Lleva la cuenta de quién te pagó cada mes."
 			/>
+			{#if !shared && initial?.members.length}<p
+					class="mt-3 text-[13px] font-semibold text-orange-strong"
+				>
+					Al dejar de compartirlo se borrarán las personas y sus pagos registrados.
+				</p>{/if}
 			{#if shared}
 				<div class="mt-5 flex flex-col gap-3">
 					{#each members as member, i (member.id)}
@@ -227,7 +216,13 @@
 								<MoneyField label="Paga al mes" bind:value={member.amount} {currency} />
 							</div>
 							<div class="mt-3 flex items-end gap-3">
-								<MonthField label="Paga desde" bind:value={member.since} class="flex-1" />
+								<MonthField
+									label="Paga desde"
+									bind:value={member.since}
+									fromYear={Number(startedOn.slice(0, 4))}
+									toYear={2100}
+									class="flex-1"
+								/>
 								<IconButton
 									icon={Trash2}
 									label="Quitar a {member.name || 'esta persona'}"
@@ -241,11 +236,6 @@
 					<div class="flex flex-wrap gap-2">
 						<Button variant="soft" size="sm" icon={Plus} onclick={addMember}>Agregar persona</Button
 						>
-						{#if members.length && amount}
-							<Button variant="ghost" size="sm" onclick={splitEqually}
-								>Repartir en partes iguales</Button
-							>
-						{/if}
 					</div>
 					{#if initial && initial.members.some((m) => !members.find((x) => x.id === m.id))}
 						<p class="text-[13px] font-semibold text-orange-strong">
@@ -271,7 +261,7 @@
 				<ServiceIcon name={name || '?'} {color} />
 				<div class="min-w-0">
 					<p class="truncate font-extrabold">{name || 'Nuevo servicio'}</p>
-					<p class="text-[13px] text-muted">{category}</p>
+					<p class="text-[13px] text-muted">Suscripción mensual</p>
 				</div>
 			</div>
 			<dl class="tabular mt-5 flex flex-col gap-3 border-t border-divider pt-4 text-[15px]">
@@ -292,7 +282,7 @@
 					</div>
 				{/if}
 			</dl>
-			<Button type="submit" size="lg" block class="mt-6">{submitLabel}</Button>
+			<Button type="submit" size="lg" block class="mt-6" loading={saving}>{submitLabel}</Button>
 		</Card>
 	</aside>
 </form>

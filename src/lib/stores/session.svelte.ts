@@ -6,6 +6,7 @@ import { resolve } from '$app/paths';
 import * as auth from '#lib/api/auth.ts';
 import { refreshSession, setAccessToken, whenSessionLost } from '#lib/api/client.ts';
 import { receipts } from './receipts.svelte';
+import { services } from './services.svelte';
 
 export type SessionUser = auth.AccountUser;
 
@@ -60,6 +61,7 @@ class SessionStore {
 		} finally {
 			this.user = null;
 			receipts.clear();
+			services.clear();
 		}
 	}
 
@@ -68,6 +70,7 @@ class SessionStore {
 		if (!this.user) return;
 		this.user = null;
 		receipts.clear();
+		services.clear();
 		void goto(resolve('/(auth)/login'), { replaceState: true });
 	}
 }

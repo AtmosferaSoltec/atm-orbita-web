@@ -1,8 +1,10 @@
 <script lang="ts">
-	import { CalendarDays, Check } from '@lucide/svelte';
-	import { Button, Modal, TextField } from '#lib/components/ui/index.ts';
+	import DatePicker from '#lib/components/ui/DatePicker.svelte';
+	import { messageFor } from '#lib/api/errors.ts';
+	import { Check } from '@lucide/svelte';
+	import { Button, Modal } from '#lib/components/ui/index.ts';
 	import { formatMoney } from '#lib/domain/money.ts';
-	import { formatMonth, todayIso, type MonthKey } from '#lib/domain/dates.ts';
+	import { formatMonth, type MonthKey } from '#lib/domain/dates.ts';
 	import type { MemberStatus, Service } from '#lib/domain/services.ts';
 	import { services } from '#lib/stores/services.svelte.ts';
 	import { toasts } from '#lib/stores/toasts.svelte.ts';
@@ -16,14 +18,15 @@
 	let { open = $bindable(), service, status }: Props = $props();
 
 	let selected = $state<MonthKey[]>([]);
-	let paidOn = $state(todayIso());
+	let paidOn = $state(services.today);
 	let error = $state<string | null>(null);
+	let saving = $state(false);
 
 	$effect(() => {
 		if (open && status) {
 			// Oldest owed month first: people usually pay what is older.
 			selected = status.owedMonths.slice(0, 1);
-			paidOn = todayIso();
+			paidOn = services.today;
 			error = null;
 		}
 	});
@@ -34,29 +37,37 @@
 			: [...selected, month];
 	}
 
-	function save() {
+	async function save() {
+		if (saving) return;
 		if (!status) return;
 		if (!selected.length) {
 			error = 'Elige al menos un mes.';
 			return;
 		}
-		if (paidOn > todayIso()) {
+		if (paidOn > services.today) {
 			error = 'La fecha no puede ser posterior a hoy.';
 			return;
 		}
-		services.markPaid(
-			service.id,
-			selected.map((month) => ({
-				memberId: status.member.id,
-				month,
-				paidOn,
-				amount: status.member.amount
-			}))
-		);
-		open = false;
-		toasts.success(
-			`${status.member.name}: ${selected.length} ${selected.length === 1 ? 'mes pagado' : 'meses pagados'}.`
-		);
+		saving = true;
+		try {
+			await services.markPaid(
+				service.id,
+				selected.map((month) => ({
+					memberId: status.member.id,
+					month,
+					paidOn,
+					amount: status.member.amount
+				}))
+			);
+			open = false;
+			toasts.success(
+				`${status.member.name}: ${selected.length} ${selected.length === 1 ? 'mes pagado' : 'meses pagados'}.`
+			);
+		} catch (failure) {
+			error = messageFor(failure);
+		} finally {
+			saving = false;
+		}
 	}
 </script>
 
@@ -94,19 +105,18 @@
 			</div>
 		</fieldset>
 		<div class="mt-4">
-			<TextField
+			<DatePicker
 				label="Fecha en que te pagó"
-				type="date"
 				bind:value={paidOn}
-				icon={CalendarDays}
-				max={todayIso()}
+				min={service.startedOn}
+				max={services.today}
 			/>
 		</div>
 		{#if error}<p class="mt-3 text-sm font-semibold text-expense-strong">{error}</p>{/if}
 	{/if}
 	{#snippet footer()}
 		<Button variant="secondary" block onclick={() => (open = false)}>Cancelar</Button>
-		<Button block onclick={save}>
+		<Button block onclick={save} loading={saving}>
 			Guardar{selected.length && status
 				? ` · ${formatMoney(selected.length * status.member.amount, service.currency)}`
 				: ''}

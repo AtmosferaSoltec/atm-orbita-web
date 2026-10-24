@@ -1,4 +1,5 @@
 <script lang="ts">
+	import ServicesStatus from '#lib/components/services/ServicesStatus.svelte';
 	import { resolve } from '$app/paths';
 	import { CalendarClock, Plus, Repeat, Users } from '@lucide/svelte';
 	import {
@@ -11,13 +12,13 @@
 	} from '#lib/components/ui/index.ts';
 	import ServiceRow from '#lib/components/services/ServiceRow.svelte';
 	import { formatMoney } from '#lib/domain/money.ts';
-	import { relativeDays, todayIso } from '#lib/domain/dates.ts';
+	import { relativeDays } from '#lib/domain/dates.ts';
 	import { monthlyTotals, owedToMe, upcomingCharges } from '#lib/domain/services.ts';
 	import { services } from '#lib/stores/services.svelte.ts';
 
 	type Filter = 'active' | 'shared' | 'inactive';
 
-	const today = todayIso();
+	const today = $derived(services.today);
 	let filter = $state<Filter>('active');
 
 	const totals = $derived(monthlyTotals(services.items));
@@ -61,19 +62,20 @@
 	{/snippet}
 </PageHeader>
 
+<ServicesStatus />
 <div class="grid gap-4 md:grid-cols-3">
 	<StatCard
 		icon={Repeat}
 		tone="primary"
 		label="Pagas al mes"
-		value={amounts(totals.PEN.total, totals.USD.total)}
+		value={services.loaded ? amounts(totals.PEN.total, totals.USD.total) : '—'}
 		hint="Tu parte: {amounts(totals.PEN.mine, totals.USD.mine)}"
 	/>
 	<StatCard
 		icon={Users}
 		tone="expense"
 		label="Te deben"
-		value={amounts(owed.PEN, owed.USD)}
+		value={services.loaded ? amounts(owed.PEN, owed.USD) : '—'}
 		colorValue={owed.PEN + owed.USD > 0}
 		hint="De tus servicios compartidos."
 	/>
@@ -81,7 +83,7 @@
 		icon={CalendarClock}
 		tone="orange"
 		label="Cobros en 7 días"
-		value={String(upcoming.length)}
+		value={services.loaded ? String(upcoming.length) : '—'}
 		hint={upcoming.length
 			? upcoming.map((c) => `${c.service.name} ${relativeDays(c.date, today)}`).join(' · ')
 			: 'Nada por cobrarse esta semana.'}
@@ -107,7 +109,7 @@
 				<li><ServiceRow {service} /></li>
 			{/each}
 		</ul>
-	{:else}
+	{:else if services.loaded && !services.error}
 		<EmptyState
 			icon={Repeat}
 			tone="orange"
