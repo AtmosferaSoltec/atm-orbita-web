@@ -15,6 +15,7 @@
 	import { formatMoney } from '#lib/domain/money.ts';
 	import { formatDate, todayIso } from '#lib/domain/dates.ts';
 	import { netOf, receiptCode } from '#lib/domain/receipts.ts';
+	import ReceiptDocuments from '#lib/components/receipts/ReceiptDocuments.svelte';
 	import { receipts } from '#lib/stores/receipts.svelte.ts';
 	import { toasts } from '#lib/stores/toasts.svelte.ts';
 
@@ -93,51 +94,54 @@
 			</dl>
 		</Card>
 
-		<Card padding="lg" class="lg:self-start">
-			<dl class="tabular flex flex-col gap-3 text-[15px]">
-				<div class="flex justify-between gap-3">
-					<dt class="text-muted">Bruto</dt>
-					<dd class="font-bold">{formatMoney(receipt.gross)}</dd>
+		<div class="flex flex-col gap-5 lg:self-start">
+			<Card padding="lg">
+				<dl class="tabular flex flex-col gap-3 text-[15px]">
+					<div class="flex justify-between gap-3">
+						<dt class="text-muted">Bruto</dt>
+						<dd class="font-bold">{formatMoney(receipt.gross)}</dd>
+					</div>
+					<div class="flex justify-between gap-3">
+						<dt class="text-muted">Retención (8 %)</dt>
+						<dd class="font-bold text-expense-strong">{formatMoney(-receipt.withholding)}</dd>
+					</div>
+					<div class="flex justify-between gap-3 border-t border-divider pt-3">
+						<dt class="font-bold">Neto</dt>
+						<dd class="text-xl font-extrabold">{formatMoney(netOf(receipt))}</dd>
+					</div>
+				</dl>
+				<div class="mt-6">
+					{#if receipt.collectedOn}
+						<Button
+							variant="secondary"
+							block
+							icon={Undo2}
+							onclick={() => receipts.setCollected(receipt.id, null)}
+						>
+							Marcar como por cobrar
+						</Button>
+					{:else}
+						<Button
+							block
+							icon={CircleCheck}
+							onclick={() => {
+								receipts.setCollected(receipt.id, todayIso());
+								toasts.success('Recibo marcado como cobrado.');
+							}}
+						>
+							Marcar como cobrado hoy
+						</Button>
+					{/if}
 				</div>
-				<div class="flex justify-between gap-3">
-					<dt class="text-muted">Retención (8 %)</dt>
-					<dd class="font-bold text-expense-strong">{formatMoney(-receipt.withholding)}</dd>
-				</div>
-				<div class="flex justify-between gap-3 border-t border-divider pt-3">
-					<dt class="font-bold">Neto</dt>
-					<dd class="text-xl font-extrabold">{formatMoney(netOf(receipt))}</dd>
-				</div>
-			</dl>
-			<div class="mt-6">
-				{#if receipt.collectedOn}
-					<Button
-						variant="secondary"
-						block
-						icon={Undo2}
-						onclick={() => receipts.setCollected(receipt.id, null)}
-					>
-						Marcar como por cobrar
-					</Button>
-				{:else}
-					<Button
-						block
-						icon={CircleCheck}
-						onclick={() => {
-							receipts.setCollected(receipt.id, todayIso());
-							toasts.success('Recibo marcado como cobrado.');
-						}}
-					>
-						Marcar como cobrado hoy
-					</Button>
-				{/if}
-			</div>
-		</Card>
+			</Card>
+			<ReceiptDocuments {receipt} />
+		</div>
 	</div>
 
 	<ConfirmDialog
 		bind:open={confirmDelete}
 		title="¿Eliminar este recibo?"
-		text="Dejará de contar para tu tope anual. Esta acción no se puede deshacer."
+		text="Dejará de contar para tu tope anual y se borrarán su XML y su PDF. Esta acción no se puede deshacer."
 		onconfirm={remove}
 	/>
 {:else}

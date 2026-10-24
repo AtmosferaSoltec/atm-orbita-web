@@ -39,6 +39,7 @@ function receipt(
 		withholding: withholding ? withholdingFor(gross) : 0,
 		collectedOn: options.collectedOn === undefined ? issueDate : options.collectedOn,
 		source: options.source ?? 'xml',
+		documents: [],
 		createdAt: CREATED
 	};
 }

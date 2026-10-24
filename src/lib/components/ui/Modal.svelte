@@ -6,12 +6,14 @@
 		open: boolean;
 		title: string;
 		description?: string;
-		size?: 'sm' | 'md';
+		size?: 'sm' | 'md' | 'lg';
 		footer?: Snippet;
 		children?: Snippet;
 	}
 
 	let { open = $bindable(), title, description, size = 'md', footer, children }: Props = $props();
+
+	const SIZES = { sm: 'max-w-sm', md: 'max-w-lg', lg: 'max-w-4xl' };
 
 	let dialog: HTMLDialogElement | undefined = $state();
 
@@ -27,10 +29,9 @@
 	bind:this={dialog}
 	onclose={() => (open = false)}
 	onclick={(e) => e.target === dialog && (open = false)}
-	class="m-auto w-[calc(100%-2rem)] rounded-hero bg-surface p-0 text-ink shadow-pop backdrop:bg-ink/40 backdrop:backdrop-blur-[2px] {size ===
-	'sm'
-		? 'max-w-sm'
-		: 'max-w-lg'}"
+	class="m-auto w-[calc(100%-2rem)] rounded-hero bg-surface p-0 text-ink shadow-pop backdrop:bg-ink/40 backdrop:backdrop-blur-[2px] {SIZES[
+		size
+	]}"
 	aria-labelledby="modal-title"
 >
 	{#if open}
@@ -50,7 +51,9 @@
 				</button>
 			</div>
 			{#if children}<div class="mt-5">{@render children()}</div>{/if}
-			{#if footer}<div class="mt-6 flex gap-3">{@render footer()}</div>{/if}
+			{#if footer}<div class="mt-6 flex flex-col-reverse gap-3 sm:flex-row">
+					{@render footer()}
+				</div>{/if}
 		</div>
 	{/if}
 </dialog>

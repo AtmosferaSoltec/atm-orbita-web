@@ -17,9 +17,10 @@
 
 <ReceiptForm
 	submitLabel="Guardar recibo"
-	onsubmit={async (draft) => {
-		const receipt = receipts.add(draft);
-		toasts.success('Recibo guardado.');
+	onsubmit={async (draft, files) => {
+		const { receipt, error } = await receipts.add(draft, files);
+		if (error) toasts.error(`Recibo guardado, pero el archivo no: ${error}`);
+		else toasts.success('Recibo guardado.');
 		await goto(resolve('/(app)/receipts/[id]', { id: receipt.id }), { replaceState: true });
 	}}
 />

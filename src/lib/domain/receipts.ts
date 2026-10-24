@@ -2,6 +2,7 @@
 
 import { applyRate, percentOf, sum, type Cents } from './money';
 import { monthKey, parts, todayIso, type IsoDate } from './dates';
+import type { StoredDocument } from './documents';
 
 export const WITHHOLDING_BASIS_POINTS = 800; // 8% income-tax withholding (4ta categoría)
 export const DEFAULT_YEARLY_LIMIT: Cents = 5_000_000; // S/ 50,000.00
@@ -28,10 +29,12 @@ export interface Receipt {
 	/** Day the client paid it; null while it is pending. */
 	collectedOn: IsoDate | null;
 	source: ReceiptSource;
+	/** The XML it was read from and an optional PDF, at most one of each. */
+	documents: StoredDocument[];
 	createdAt: string;
 }
 
-export type ReceiptDraft = Omit<Receipt, 'id' | 'createdAt'>;
+export type ReceiptDraft = Omit<Receipt, 'id' | 'createdAt' | 'documents'>;
 
 export type LimitLevel = 'ok' | 'warning' | 'exceeded';
 

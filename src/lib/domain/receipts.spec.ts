@@ -13,6 +13,7 @@ function receipt(overrides: Partial<Receipt>): Receipt {
 		withholding: 28000,
 		collectedOn: null,
 		source: 'manual',
+		documents: [],
 		createdAt: '',
 		...overrides
 	};

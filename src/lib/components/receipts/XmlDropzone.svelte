@@ -1,15 +1,14 @@
 <script lang="ts">
 	import { CloudUpload, FileCode, LoaderCircle } from '@lucide/svelte';
 	import { parseRheXml, RheXmlError, type ParsedReceipt } from '#lib/domain/rhe-xml.ts';
+	import { MAX_DOCUMENT_BYTES } from '#lib/domain/documents.ts';
 
 	interface Props {
-		onparsed: (receipt: ParsedReceipt, fileName: string) => void;
+		onparsed: (receipt: ParsedReceipt, file: File) => void;
 		onerror: (message: string) => void;
 	}
 
 	let { onparsed, onerror }: Props = $props();
-
-	const MAX_BYTES = 1_000_000;
 
 	let dragging = $state(false);
 	let reading = $state(false);
@@ -22,7 +21,7 @@
 			onerror('Elige el archivo .xml del recibo (no el PDF).');
 			return;
 		}
-		if (file.size > MAX_BYTES) {
+		if (file.size > MAX_DOCUMENT_BYTES.xml) {
 			onerror('El archivo es demasiado grande para ser un recibo.');
 			return;
 		}
@@ -30,7 +29,7 @@
 		try {
 			const parsed = parseRheXml(await file.text());
 			fileName = file.name;
-			onparsed(parsed, file.name);
+			onparsed(parsed, file);
 		} catch (error) {
 			onerror(error instanceof RheXmlError ? error.message : 'No se pudo leer el archivo.');
 		} finally {

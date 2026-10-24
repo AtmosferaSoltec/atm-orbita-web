@@ -12,6 +12,7 @@ Plus: landing (`/`), login, register, forgot password (3 steps, like Android) an
 
 - **Mockups only**: everything runs on sample data in memory + `localStorage` (`src/lib/data/seed.ts`). There is **no connection to the API** yet, and nothing in `atm-orbita-api` or `atm-orbita-android` is touched from here.
 - The demo session lets in any email and a password of 8+ characters.
+- Receipt files (XML and optional PDF) are kept in the browser's IndexedDB through `src/lib/data/document-storage.ts`. Keys follow the R2 layout (`receipts/{receiptId}/{documentId}.{xml|pdf}`). With the API, that file becomes the Cloudflare R2 implementation: the API signs upload/download URLs and the browser never holds R2 credentials.
 - The public loan link only works in the same browser for now (it reads the local demo data). With the API it will be a public endpoint by token.
 
 ## Language rule (non-negotiable)
@@ -31,11 +32,12 @@ Plus: landing (`/`), login, register, forgot password (3 steps, like Android) an
 
 ```
 src/lib/domain/       Pure rules (TS, no Svelte): money, dates, receipts, loans, services, rhe-xml. With tests (*.spec.ts).
-src/lib/data/         Demo persistence (storage.ts) and sample data (seed.ts).
+src/lib/data/         Demo persistence (storage.ts), file storage (document-storage.ts) and sample data (seed.ts).
 src/lib/stores/       State with runes (*.svelte.ts). The only place to swap for API calls.
 src/lib/components/
   ui/                 Reusable design-system components (Button, Card, TextField, Modal, HeroCard…).
   layout/             AppShell (sidebar on desktop, bottom bar on mobile), UserMenu, FloatingCards.
+  documents/          File slot, viewer (PDF embedded, XML formatted) and download helpers.
   receipts|loans|services/  Components for each module.
 src/routes/
   (auth)/             login, register, forgot-password (redirect to /dashboard if a session exists).

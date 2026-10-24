@@ -12,6 +12,8 @@
 		TextField
 	} from '#lib/components/ui/index.ts';
 	import XmlDropzone from './XmlDropzone.svelte';
+	import DocumentSlot from '#lib/components/documents/DocumentSlot.svelte';
+	import { looksLikePdf, validateDocumentFile, type DocumentKind } from '#lib/domain/documents.ts';
 	import { formatMoney, parseAmount, toInputValue } from '#lib/domain/money.ts';
 	import { todayIso } from '#lib/domain/dates.ts';
 	import {
@@ -30,7 +32,8 @@
 	interface Props {
 		initial?: Receipt;
 		submitLabel: string;
-		onsubmit: (draft: ReceiptDraft) => void;
+		/** `files` only when creating: the uploaded XML and the optional PDF. */
+		onsubmit: (draft: ReceiptDraft, files: Partial<Record<DocumentKind, File>>) => void;
 	}
 
 	let { initial, submitLabel, onsubmit }: Props = $props();
@@ -54,6 +57,8 @@
 	let collected = $state(start ? start.collectedOn !== null : false);
 	let collectedOn = $state(start?.collectedOn ?? todayIso());
 	let xmlNotice = $state<string | null>(null);
+	let xmlFile = $state<File | null>(null);
+	let pdfFile = $state<File | null>(null);
 
 	const gross = $derived(parseAmount(grossText) ?? 0);
 	// The XML brings the exact withholding; typed receipts use 8%.
@@ -66,8 +71,9 @@
 	);
 	const showForm = $derived(mode === 'manual' || source === 'xml');
 
-	function fillFromXml(parsed: ParsedReceipt) {
+	function fillFromXml(parsed: ParsedReceipt, file: File) {
 		source = 'xml';
+		xmlFile = file;
 		series = parsed.series || series;
 		number = parsed.number;
 		issueDate = parsed.issueDate || issueDate;
@@ -105,7 +111,18 @@
 			toasts.error(error);
 			return;
 		}
-		onsubmit(draft);
+		const files: Partial<Record<DocumentKind, File>> = {};
+		if (source === 'xml' && xmlFile) files.xml = xmlFile;
+		if (pdfFile) files.pdf = pdfFile;
+		onsubmit(draft, files);
+	}
+
+	async function pickPdf(file: File) {
+		const error =
+			validateDocumentFile(file, 'pdf') ??
+			((await looksLikePdf(file)) ? null : 'El archivo no es un PDF válido.');
+		if (error) toasts.error(error);
+		else pdfFile = file;
 	}
 </script>
 
@@ -231,6 +248,31 @@
 					{/if}
 				</div>
 			</Card>
+
+			{#if !initial}
+				<Card padding="lg">
+					<h2 class="text-base font-extrabold">Documentos</h2>
+					<p class="mt-1 text-[13px] text-muted">Se guardan junto con el recibo.</p>
+					<div class="mt-4 flex flex-col gap-2.5">
+						{#if source === 'xml' && xmlFile}
+							<DocumentSlot
+								kind="xml"
+								label="XML"
+								file={{ fileName: xmlFile.name, size: xmlFile.size }}
+								emptyText=""
+							/>
+						{/if}
+						<DocumentSlot
+							kind="pdf"
+							label="PDF"
+							file={pdfFile ? { fileName: pdfFile.name, size: pdfFile.size } : null}
+							emptyText="Opcional. Arrastra el PDF del recibo o elígelo."
+							onpick={pickPdf}
+							onremove={pdfFile ? () => (pdfFile = null) : undefined}
+						/>
+					</div>
+				</Card>
+			{/if}
 		{/if}
 	</div>
 
