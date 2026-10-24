@@ -25,8 +25,9 @@ export interface ParsedReceipt {
 
 export class RheXmlError extends Error {}
 
+/** Descendants by local name, whatever their namespace prefix (`cbc:ID`, `ID`…). */
 function children(parent: Element | Document, name: string): Element[] {
-	return Array.from(parent.getElementsByTagNameNS('*', name));
+	return Array.from(parent.querySelectorAll('*')).filter((el) => el.localName === name);
 }
 
 function first(parent: Element | Document | null | undefined, ...path: string[]): Element | null {
@@ -38,8 +39,13 @@ function first(parent: Element | Document | null | undefined, ...path: string[])
 	return (current as Element | null) ?? null;
 }
 
+/** Trimmed text with inner runs of spaces collapsed (SUNAT pads names with spaces). */
+function clean(value: string | null | undefined): string {
+	return value?.replace(/\s+/g, ' ').trim() ?? '';
+}
+
 function text(parent: Element | Document | null | undefined, ...path: string[]): string {
-	return first(parent, ...path)?.textContent?.trim() ?? '';
+	return clean(first(parent, ...path)?.textContent);
 }
 
 function amount(element: Element | null): Cents | null {
@@ -65,6 +71,34 @@ function partyName(party: Element | null): string {
 	return text(party, 'RegistrationName') || text(party, 'PartyName', 'Name') || text(party, 'Name');
 }
 
+/** A direct child of `parent` by local name (root fields also appear nested, e.g. in OrderReference). */
+function child(parent: Element | null, name: string): Element | null {
+	return parent ? (Array.from(parent.children).find((el) => el.localName === name) ?? null) : null;
+}
+
+/** Amounts of 0.00 count as missing: SUNAT fills unused totals with zeros. */
+function positive(value: Cents | null): Cents | null {
+	return value !== null && value > 0 ? value : null;
+}
+
+/** The TaxSubtotal of the 4th-category withholding (`TaxCategory/ID` = `RET 4TA`). */
+function withholdingSubtotal(doc: Document): Element | null {
+	return (
+		children(doc, 'TaxSubtotal').find((subtotal) =>
+			text(subtotal, 'TaxCategory', 'ID').toUpperCase().startsWith('RET')
+		) ?? null
+	);
+}
+
+/*
+ * Shape of SUNAT's RHE XML (checked against a real receipt, Sep 2026):
+ * - cbc:ID `E001-109` and cbc:IssueDate as direct children of Invoice.
+ * - Customer: CustomerAssignedAccountID (number), AdditionalAccountID (6 = RUC), PartyName/Name.
+ * - Gross: TaxTotal/TaxSubtotal/TaxableAmount (also InvoiceLine/Price/PriceAmount).
+ * - Net: LegalMonetaryTotal/PayableAmount. LineExtensionAmount comes as 0.00, so it is ignored.
+ * - Withholding: the InvoiceLine TaxSubtotal whose TaxCategory/ID is `RET 4TA` (8%).
+ * - cbc:Note holds the amount in words, not a description.
+ */
 export function parseRheXml(xml: string): ParsedReceipt {
 	const doc = new DOMParser().parseFromString(xml, 'application/xml');
 	if (doc.getElementsByTagName('parsererror').length > 0) {
@@ -72,40 +106,39 @@ export function parseRheXml(xml: string): ParsedReceipt {
 	}
 
 	const root = doc.documentElement;
-	const id =
-		children(root, 'ID')
-			.find((el) => el.parentElement === root)
-			?.textContent?.trim() ?? '';
+	const id = clean(child(root, 'ID')?.textContent);
 	if (!id && !first(doc, 'LegalMonetaryTotal')) {
 		throw new RheXmlError('No parece un recibo por honorarios electrónico.');
 	}
 	const [series = '', number = ''] = id.split('-');
 
-	const issueDateText = text(root, 'IssueDate');
+	const issueDateText = clean(child(root, 'IssueDate')?.textContent);
 	const supplier = first(doc, 'AccountingSupplierParty');
 	const customer = first(doc, 'AccountingCustomerParty');
 	const customerDoc = partyDocument(customer);
 	const supplierDoc = partyDocument(supplier);
 
 	const totals = first(doc, 'LegalMonetaryTotal');
-	const payable = amount(first(totals, 'PayableAmount'));
-	const lineExtension =
-		amount(first(totals, 'LineExtensionAmount')) ??
-		amount(first(doc, 'InvoiceLine', 'LineExtensionAmount'));
-	const taxInclusive = amount(first(totals, 'TaxInclusiveAmount'));
-	const taxAmount = amount(first(doc, 'TaxTotal', 'TaxAmount'));
+	const payable = positive(amount(first(totals, 'PayableAmount')));
+	const retention = withholdingSubtotal(doc);
+	const declaredWithholding = amount(first(retention, 'TaxAmount'));
 
-	// Gross = amount before the 8% withholding. Prefer explicit totals; derive it otherwise.
-	let gross = lineExtension ?? taxInclusive;
-	if (gross === null && payable !== null) gross = payable + (taxAmount ?? 0);
-	let withholding = taxAmount;
-	if (withholding === null && gross !== null && payable !== null) withholding = gross - payable;
+	const gross =
+		positive(amount(first(child(root, 'TaxTotal'), 'TaxSubtotal', 'TaxableAmount'))) ??
+		positive(amount(first(doc, 'InvoiceLine', 'Price', 'PriceAmount'))) ??
+		positive(amount(first(totals, 'TaxInclusiveAmount'))) ??
+		positive(amount(first(totals, 'LineExtensionAmount'))) ??
+		(payable !== null ? payable + (declaredWithholding ?? 0) : null);
+
+	// The net actually payable is the most reliable figure: withholding = gross − net.
+	let withholding: Cents | null = declaredWithholding;
+	if (gross !== null && payable !== null && gross >= payable) withholding = gross - payable;
 	if (withholding !== null && gross !== null && withholding >= gross)
 		withholding = withholdingFor(gross);
 
 	const currency =
 		first(totals, 'PayableAmount')?.getAttribute('currencyID') ||
-		text(root, 'DocumentCurrencyCode') ||
+		clean(child(root, 'DocumentCurrencyCode')?.textContent) ||
 		'PEN';
 
 	const parsed: ParsedReceipt = {
@@ -117,7 +150,7 @@ export function parseRheXml(xml: string): ParsedReceipt {
 		clientName: partyName(customer),
 		clientDocType: docTypeFrom(customerDoc.code, customerDoc.number),
 		clientDocNumber: customerDoc.number,
-		description: text(doc, 'InvoiceLine', 'Item', 'Description') || text(root, 'Note'),
+		description: text(doc, 'InvoiceLine', 'Item', 'Description'),
 		currency,
 		gross,
 		withholding,

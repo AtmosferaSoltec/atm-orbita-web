@@ -1,43 +1,87 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<!-- Sample recibo por honorarios (fictional data) to try the XML upload. -->
-<Invoice xmlns="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2"
-	xmlns:cac="urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2"
-	xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2">
-	<cbc:UBLVersionID>2.0</cbc:UBLVersionID>
-	<cbc:CustomizationID>1.0</cbc:CustomizationID>
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Sample recibo por honorarios with the same shape as SUNAT's RHE XML (fictional data, signature removed). -->
+<Invoice xmlns="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2" xmlns:cac="urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2" xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2" xmlns:ext="urn:oasis:names:specification:ubl:schema:xsd:CommonExtensionComponents-2">
+	<ext:UBLExtensions>
+		<ext:UBLExtension>
+			<ext:ExtensionContent/>
+		</ext:UBLExtension>
+	</ext:UBLExtensions>
 	<cbc:ID>E001-58</cbc:ID>
 	<cbc:IssueDate>2026-10-20</cbc:IssueDate>
-	<cbc:DocumentCurrencyCode>PEN</cbc:DocumentCurrencyCode>
+	<cbc:IssueTime>10:15:00</cbc:IssueTime>
+	<cbc:ExpiryDate/>
+	<cbc:InvoiceTypeCode>01</cbc:InvoiceTypeCode>
+	<cbc:Note> TRES MIL QUINIENTOS Y 00/100 SOLES</cbc:Note>
+	<cac:OrderReference>
+		<cbc:ID>E001-58</cbc:ID>
+		<cac:DocumentReference>
+			<cbc:ID>0</cbc:ID>
+			<cbc:IssueDate>2026-10-20</cbc:IssueDate>
+			<cbc:DocumentTypeCode>0</cbc:DocumentTypeCode>
+			<cbc:DocumentType>-</cbc:DocumentType>
+		</cac:DocumentReference>
+	</cac:OrderReference>
 	<cac:AccountingSupplierParty>
 		<cbc:CustomerAssignedAccountID>10456789012</cbc:CustomerAssignedAccountID>
-		<cbc:AdditionalAccountID>6</cbc:AdditionalAccountID>
 		<cac:Party>
-			<cac:PartyLegalEntity>
-				<cbc:RegistrationName>PÉREZ QUISPE JUAN CARLOS</cbc:RegistrationName>
-			</cac:PartyLegalEntity>
+			<cac:PartyName>
+				<cbc:Name>PEREZ QUISPE JUAN CARLOS                                        </cbc:Name>
+			</cac:PartyName>
 		</cac:Party>
 	</cac:AccountingSupplierParty>
 	<cac:AccountingCustomerParty>
 		<cbc:CustomerAssignedAccountID>20601234567</cbc:CustomerAssignedAccountID>
 		<cbc:AdditionalAccountID>6</cbc:AdditionalAccountID>
 		<cac:Party>
-			<cac:PartyLegalEntity>
-				<cbc:RegistrationName>ANDES DIGITAL S.A.C.</cbc:RegistrationName>
-			</cac:PartyLegalEntity>
+			<cac:PartyName>
+				<cbc:Name>ANDES DIGITAL S.A.C.</cbc:Name>
+			</cac:PartyName>
 		</cac:Party>
 	</cac:AccountingCustomerParty>
+	<cac:PaymentTerms>
+		<cbc:ID>FormaPago</cbc:ID>
+		<cbc:PaymentMeansID>Contado</cbc:PaymentMeansID>
+		<cbc:Amount currencyID=""/>
+		<cbc:PaymentDueDate/>
+	</cac:PaymentTerms>
 	<cac:TaxTotal>
 		<cbc:TaxAmount currencyID="PEN">280.00</cbc:TaxAmount>
+		<cac:TaxSubtotal>
+			<cbc:TaxableAmount currencyID="PEN">3500.00</cbc:TaxableAmount>
+			<cbc:TaxAmount currencyID="PEN">280.00</cbc:TaxAmount>
+			<cac:TaxCategory>
+				<cbc:ID>A</cbc:ID>
+				<cac:TaxScheme/>
+			</cac:TaxCategory>
+		</cac:TaxSubtotal>
 	</cac:TaxTotal>
 	<cac:LegalMonetaryTotal>
-		<cbc:LineExtensionAmount currencyID="PEN">3500.00</cbc:LineExtensionAmount>
+		<cbc:LineExtensionAmount currencyID="PEN">0.00</cbc:LineExtensionAmount>
+		<cbc:TaxExclusiveAmount currencyID="PEN">0.00</cbc:TaxExclusiveAmount>
 		<cbc:PayableAmount currencyID="PEN">3220.00</cbc:PayableAmount>
 	</cac:LegalMonetaryTotal>
 	<cac:InvoiceLine>
-		<cbc:ID>1</cbc:ID>
-		<cbc:LineExtensionAmount currencyID="PEN">3500.00</cbc:LineExtensionAmount>
+		<cbc:ID>0001</cbc:ID>
+		<cbc:Note>-  </cbc:Note>
+		<cbc:InvoicedQuantity unitCode="ZZ">0.00</cbc:InvoicedQuantity>
+		<cbc:LineExtensionAmount currencyID="PEN">0.00</cbc:LineExtensionAmount>
+		<cac:TaxTotal>
+			<cbc:TaxAmount currencyID="PEN">3500.00</cbc:TaxAmount>
+			<cac:TaxSubtotal>
+				<cbc:TaxAmount currencyID="PEN">280.00</cbc:TaxAmount>
+				<cbc:Percent>8.00</cbc:Percent>
+				<cac:TaxCategory>
+					<cbc:ID>RET 4TA</cbc:ID>
+					<cbc:Name/>
+					<cac:TaxScheme/>
+				</cac:TaxCategory>
+			</cac:TaxSubtotal>
+		</cac:TaxTotal>
 		<cac:Item>
-			<cbc:Description>Desarrollo de aplicación web - octubre 2026</cbc:Description>
+			<cbc:Description>DESARROLLO DE APLICACION WEB - OCTUBRE 2026  </cbc:Description>
 		</cac:Item>
+		<cac:Price>
+			<cbc:PriceAmount currencyID="PEN">3500.00</cbc:PriceAmount>
+		</cac:Price>
 	</cac:InvoiceLine>
 </Invoice>
