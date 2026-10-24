@@ -2,7 +2,7 @@
 	import { Card, ConfirmDialog } from '#lib/components/ui/index.ts';
 	import DocumentSlot from '#lib/components/documents/DocumentSlot.svelte';
 	import DocumentViewer from '#lib/components/documents/DocumentViewer.svelte';
-	import { downloadBlob } from '#lib/components/documents/files.ts';
+	import { messageFor } from '#lib/api/errors.ts';
 	import type { DocumentKind, StoredDocument } from '#lib/domain/documents.ts';
 	import type { Receipt } from '#lib/domain/receipts.ts';
 	import { receipts } from '#lib/stores/receipts.svelte.ts';
@@ -32,10 +32,17 @@
 		else toasts.success(`${kind.toUpperCase()} ${replacing ? 'reemplazado' : 'guardado'}.`);
 	}
 
-	async function download(document: StoredDocument) {
-		const blob = await receipts.read(document);
-		if (blob) downloadBlob(blob, document.fileName);
-		else toasts.error('No encontramos este archivo. Súbelo de nuevo.');
+	// The file comes straight from R2 through a short-lived signed URL; R2 sends it
+	// as an attachment, so the browser saves it without leaving the page.
+	async function download(kind: DocumentKind) {
+		try {
+			const link = window.document.createElement('a');
+			link.href = await receipts.downloadUrl(receipt.id, kind);
+			link.rel = 'noopener';
+			link.click();
+		} catch (failure) {
+			toasts.error(messageFor(failure));
+		}
 	}
 </script>
 
@@ -58,7 +65,7 @@
 							viewerOpen = true;
 						}
 					: undefined}
-				ondownload={document ? () => download(document) : undefined}
+				ondownload={document ? () => download(slot.kind) : undefined}
 				onremove={document
 					? () => {
 							toRemove = document;
@@ -70,7 +77,11 @@
 	</div>
 </Card>
 
-<DocumentViewer bind:open={viewerOpen} document={viewing} load={(d) => receipts.read(d)} />
+<DocumentViewer
+	bind:open={viewerOpen}
+	document={viewing}
+	load={(d) => receipts.read(receipt.id, d.kind)}
+/>
 
 <ConfirmDialog
 	bind:open={confirmRemove}
@@ -79,7 +90,11 @@
 	confirmLabel="Quitar"
 	onconfirm={async () => {
 		if (!toRemove) return;
-		await receipts.detach(receipt.id, toRemove.id);
-		toasts.success('Archivo quitado.');
+		try {
+			await receipts.detach(receipt.id, toRemove.kind);
+			toasts.success('Archivo quitado.');
+		} catch (failure) {
+			toasts.error(messageFor(failure));
+		}
 	}}
 />

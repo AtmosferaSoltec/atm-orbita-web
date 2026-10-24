@@ -25,21 +25,23 @@
 		let cancelled = false;
 		status = 'loading';
 
-		load(current).then(async (result) => {
-			if (cancelled) return;
-			if (!result) {
-				status = 'missing';
-				return;
-			}
-			blob = result;
-			if (current.kind === 'pdf') {
-				objectUrl = URL.createObjectURL(new Blob([result], { type: 'application/pdf' }));
-				url = objectUrl;
-			} else {
-				xmlText = formatXml(await result.text());
-			}
-			status = 'ready';
-		});
+		load(current)
+			.catch(() => null)
+			.then(async (result) => {
+				if (cancelled) return;
+				if (!result) {
+					status = 'missing';
+					return;
+				}
+				blob = result;
+				if (current.kind === 'pdf') {
+					objectUrl = URL.createObjectURL(new Blob([result], { type: 'application/pdf' }));
+					url = objectUrl;
+				} else {
+					xmlText = formatXml(await result.text());
+				}
+				status = 'ready';
+			});
 
 		return () => {
 			cancelled = true;
@@ -65,7 +67,7 @@
 		</div>
 	{:else if status === 'missing'}
 		<p class="rounded-2xl bg-expense-soft px-4 py-3 text-sm font-semibold text-expense-strong">
-			No encontramos este archivo. Puede que se haya borrado; súbelo de nuevo.
+			No se pudo abrir el archivo. Revisa tu conexión e inténtalo de nuevo.
 		</p>
 	{:else if document?.kind === 'pdf' && url}
 		<!-- Browsers without a built-in PDF viewer (some phones) show the fallback instead. -->

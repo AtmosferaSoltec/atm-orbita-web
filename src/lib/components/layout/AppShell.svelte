@@ -36,7 +36,7 @@
 			<p
 				class="mb-3 rounded-2xl bg-orange-soft px-3 py-2.5 text-xs font-semibold text-orange-strong"
 			>
-				Maqueta con datos de ejemplo. Aún no se conecta al API.
+				Préstamos y servicios aún son maqueta con datos de ejemplo.
 			</p>
 			<UserMenu />
 		</div>

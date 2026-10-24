@@ -1,10 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-	formatFileSize,
-	looksLikePdf,
-	receiptDocumentKey,
-	validateDocumentFile
-} from './documents';
+import { formatFileSize, looksLikePdf, validateDocumentFile } from './documents';
 
 describe('validateDocumentFile', () => {
 	it('accepts the right extension within the size limit', () => {
@@ -35,10 +30,6 @@ describe('looksLikePdf', () => {
 });
 
 describe('helpers', () => {
-	it('lays out keys as in R2', () => {
-		expect(receiptDocumentKey('r1', 'd1', 'pdf')).toBe('receipts/r1/d1.pdf');
-	});
-
 	it('formats sizes', () => {
 		expect(formatFileSize(820)).toBe('820 B');
 		expect(formatFileSize(12_345)).toBe('12 KB');

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
 	import {
 		ArrowDownLeft,
@@ -20,7 +21,6 @@
 		daysBetween,
 		formatDate,
 		formatShortDate,
-		parts,
 		relativeDays,
 		todayIso
 	} from '#lib/domain/dates.ts';
@@ -31,6 +31,8 @@
 	import { receipts } from '#lib/stores/receipts.svelte.ts';
 	import { services } from '#lib/stores/services.svelte.ts';
 	import { session } from '#lib/stores/session.svelte.ts';
+	import { toasts } from '#lib/stores/toasts.svelte.ts';
+	import { messageFor } from '#lib/api/errors.ts';
 
 	interface Alert {
 		key: string;
@@ -55,9 +57,21 @@
 	}
 
 	const today = todayIso();
-	const year = parts(today).year;
+	// Receipts are real (API); loans and services are still mockups in this browser.
+	const year = $derived(receipts.currentYear);
+	const receiptItems = $derived(receipts.itemsOf(year) ?? []);
+	const receiptsLoaded = $derived(receipts.itemsOf(year) !== undefined);
 
-	const receiptSummary = $derived(summarizeYear(receipts.items, year, receipts.limitFor(year)));
+	onMount(async () => {
+		try {
+			await receipts.loadYears();
+			await receipts.loadYear(receipts.currentYear);
+		} catch (failure) {
+			toasts.error(messageFor(failure));
+		}
+	});
+
+	const receiptSummary = $derived(summarizeYear(receiptItems, year, receipts.limitFor(year)));
 	const loanSummaries = $derived(
 		loans.items.map((loan) => ({ loan, summary: summarizeLoan(loan, today) }))
 	);
@@ -161,7 +175,7 @@
 				priority: 1
 			});
 		}
-		const pending = receipts.items.filter((r) => !r.collectedOn);
+		const pending = receiptItems.filter((r) => !r.collectedOn);
 		if (pending.length) {
 			list.push({
 				key: 'receipts-pending',
@@ -179,7 +193,7 @@
 
 	const activity = $derived.by(() => {
 		const list: Activity[] = [];
-		for (const r of receipts.items) {
+		for (const r of receiptItems) {
 			list.push({
 				key: `r-${r.id}`,
 				date: r.issueDate,
@@ -251,7 +265,15 @@
 		class="block rounded-hero transition hover:-translate-y-px"
 		aria-label="Ver recibos por honorarios"
 	>
-		<LimitCard summary={receiptSummary} />
+		{#if receiptsLoaded}
+			<LimitCard summary={receiptSummary} />
+		{:else}
+			<div
+				class="h-full min-h-60 animate-pulse rounded-hero bg-neutral-soft"
+				aria-busy="true"
+				aria-label="Cargando recibos"
+			></div>
+		{/if}
 	</a>
 	<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
 		<StatCard

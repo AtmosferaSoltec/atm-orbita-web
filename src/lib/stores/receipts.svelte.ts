@@ -1,170 +1,168 @@
-import { loadJson, newId, saveJson } from '#lib/data/storage.ts';
-import { documentStorage } from '#lib/data/document-storage.ts';
-import { seedReceipts } from '#lib/data/seed.ts';
-import {
-	DEFAULT_YEARLY_LIMIT,
-	receiptCode,
-	type Receipt,
-	type ReceiptDraft
-} from '#lib/domain/receipts.ts';
-import {
-	CONTENT_TYPE,
-	looksLikePdf,
-	receiptDocumentKey,
-	validateDocumentFile,
-	type DocumentKind,
-	type StoredDocument
-} from '#lib/domain/documents.ts';
-import { parseRheXml, RheXmlError } from '#lib/domain/rhe-xml.ts';
+// Receipts of the signed-in person, read from and written to the API. Keeps the
+// years already loaded so moving between pages does not refetch everything.
+
+import * as remote from '#lib/api/receipts.ts';
+import { messageFor } from '#lib/api/errors.ts';
+import { DEFAULT_YEARLY_LIMIT, type Receipt, type ReceiptDraft } from '#lib/domain/receipts.ts';
+import { looksLikePdf, validateDocumentFile, type DocumentKind } from '#lib/domain/documents.ts';
+import { parts } from '#lib/domain/dates.ts';
 import type { Cents } from '#lib/domain/money.ts';
 
-const ITEMS_KEY = 'receipts';
-const LIMITS_KEY = 'receipt-limits';
-
-/** Receipts saved before documents existed have no `documents` field. */
-function loadReceipts(): Receipt[] {
-	return loadJson(ITEMS_KEY, seedReceipts).map((r) => ({ ...r, documents: r.documents ?? [] }));
+function yearOf(receipt: Pick<Receipt, 'issueDate'>): number {
+	return parts(receipt.issueDate).year;
 }
 
 class ReceiptsStore {
-	items = $state<Receipt[]>(loadReceipts());
-	/** Yearly cap by year; years without one use the default. */
-	limits = $state<Record<string, Cents>>(loadJson(LIMITS_KEY, () => ({})));
+	/** Receipts by year, newest first; a year is missing until it is loaded. */
+	byYear = $state<Record<number, Receipt[]>>({});
+	/** Receipts opened one by one (a detail page opened directly), by id. */
+	byId = $state<Record<string, Receipt>>({});
+	limits = $state<Record<number, remote.YearLimit>>({});
+	years = $state<number[]>([]);
+	currentYear = $state(new Date().getFullYear());
 
-	get(id: string): Receipt | undefined {
-		return this.items.find((r) => r.id === id);
+	itemsOf(year: number): Receipt[] | undefined {
+		return this.byYear[year];
+	}
+
+	/** Every receipt loaded so far (for the duplicate check of the form). */
+	get loaded(): Receipt[] {
+		return Object.values(this.byYear).flat();
+	}
+
+	find(id: string): Receipt | undefined {
+		return this.byId[id] ?? this.loaded.find((r) => r.id === id);
 	}
 
 	limitFor(year: number): Cents {
-		return this.limits[String(year)] ?? DEFAULT_YEARLY_LIMIT;
+		return this.limits[year]?.amount ?? DEFAULT_YEARLY_LIMIT;
 	}
 
-	setLimit(year: number, limit: Cents): void {
-		this.limits[String(year)] = limit;
-		saveJson(LIMITS_KEY, $state.snapshot(this.limits));
+	async loadYears(): Promise<void> {
+		const data = await remote.receiptYears();
+		this.years = data.years;
+		this.currentYear = data.current_year;
 	}
 
-	/** Saves the receipt and then its files. Returns the receipt and the first file problem, if any. */
+	async loadYear(year: number): Promise<Receipt[]> {
+		const [items, limit] = await Promise.all([
+			remote.listReceipts(year),
+			remote.getYearLimit(year)
+		]);
+		this.byYear[year] = items;
+		this.limits[year] = limit;
+		return items;
+	}
+
+	async setLimit(year: number, amount: Cents): Promise<void> {
+		this.limits[year] = await remote.setYearLimit(year, amount);
+	}
+
+	async get(id: string): Promise<Receipt> {
+		const receipt = await remote.getReceipt(id);
+		this.#put(receipt);
+		return receipt;
+	}
+
+	/**
+	 * Creates the receipt and then uploads its files. Returns the receipt and,
+	 * if a file could not be saved, the message to show (the receipt stays).
+	 */
 	async add(
 		draft: ReceiptDraft,
 		files: Partial<Record<DocumentKind, File>> = {}
 	): Promise<{ receipt: Receipt; error: string | null }> {
-		const receipt: Receipt = {
-			...draft,
-			id: newId(),
-			documents: [],
-			createdAt: new Date().toISOString()
-		};
-		this.items.push(receipt);
-		this.#save();
-
+		let receipt = await remote.createReceipt(crypto.randomUUID(), draft);
+		this.#put(receipt);
 		let error: string | null = null;
 		for (const [kind, file] of Object.entries(files) as [DocumentKind, File][]) {
 			error ??= await this.attach(receipt.id, kind, file);
 		}
+		receipt = this.find(receipt.id) ?? receipt;
 		return { receipt, error };
 	}
 
-	update(id: string, draft: ReceiptDraft): void {
-		const index = this.items.findIndex((r) => r.id === id);
-		if (index < 0) return;
-		this.items[index] = { ...this.items[index], ...draft };
-		this.#save();
+	async update(id: string, draft: ReceiptDraft): Promise<Receipt> {
+		const receipt = await remote.updateReceipt(id, draft);
+		this.#put(receipt);
+		return receipt;
 	}
 
-	setCollected(id: string, collectedOn: string | null): void {
-		const receipt = this.get(id);
-		if (!receipt) return;
-		receipt.collectedOn = collectedOn;
-		this.#save();
+	async setCollected(id: string, collectedOn: string | null): Promise<void> {
+		this.#put(await remote.setReceiptCollected(id, collectedOn));
 	}
 
-	remove(id: string): void {
-		const receipt = this.get(id);
-		receipt?.documents.forEach((d) => void documentStorage.remove(d.storageKey));
-		this.items = this.items.filter((r) => r.id !== id);
-		this.#save();
-	}
-
-	document(receiptId: string, kind: DocumentKind): StoredDocument | undefined {
-		return this.get(receiptId)?.documents.find((d) => d.kind === kind);
+	async remove(id: string): Promise<void> {
+		await remote.deleteReceipt(id);
+		this.#drop(id);
 	}
 
 	/**
-	 * Stores a file for the receipt, replacing the previous one of the same kind.
-	 * Returns a message for the person when the file is not acceptable, or null.
+	 * Uploads a file for the receipt, replacing the previous one of the same kind.
+	 * Returns a message for the person when it fails, or null.
 	 */
-	async attach(receiptId: string, kind: DocumentKind, file: File): Promise<string | null> {
-		const receipt = this.get(receiptId);
-		if (!receipt) return 'Este registro ya no existe.';
-
+	async attach(id: string, kind: DocumentKind, file: File): Promise<string | null> {
 		const problem =
-			validateDocumentFile(file, kind) ?? (await this.#checkContent(receipt, kind, file));
+			validateDocumentFile(file, kind) ??
+			(kind === 'pdf' && !(await looksLikePdf(file)) ? 'El archivo no es un PDF válido.' : null);
 		if (problem) return problem;
-
-		const id = newId();
-		const document: StoredDocument = {
-			id,
-			kind,
-			fileName: file.name,
-			size: file.size,
-			contentType: CONTENT_TYPE[kind],
-			storageKey: receiptDocumentKey(receiptId, id, kind),
-			uploadedAt: new Date().toISOString()
-		};
 		try {
-			await documentStorage.put(document.storageKey, file);
-		} catch {
-			return 'No se pudo guardar el archivo. Inténtalo de nuevo.';
-		}
-
-		const previous = this.document(receiptId, kind);
-		if (previous) void documentStorage.remove(previous.storageKey);
-		receipt.documents = [...receipt.documents.filter((d) => d.kind !== kind), document];
-		this.#save();
-		return null;
-	}
-
-	async detach(receiptId: string, documentId: string): Promise<void> {
-		const receipt = this.get(receiptId);
-		const document = receipt?.documents.find((d) => d.id === documentId);
-		if (!receipt || !document) return;
-		receipt.documents = receipt.documents.filter((d) => d.id !== documentId);
-		this.#save();
-		await documentStorage.remove(document.storageKey);
-	}
-
-	/** The file's bytes, or null if storage no longer has them. */
-	read(document: StoredDocument): Promise<Blob | null> {
-		return documentStorage.get(document.storageKey);
-	}
-
-	reset(): void {
-		this.items = seedReceipts();
-		this.limits = {};
-		this.#save();
-		saveJson(LIMITS_KEY, {});
-		void documentStorage.clear();
-	}
-
-	async #checkContent(receipt: Receipt, kind: DocumentKind, file: File): Promise<string | null> {
-		if (kind === 'pdf') {
-			return (await looksLikePdf(file)) ? null : 'El archivo no es un PDF válido.';
-		}
-		try {
-			const parsed = parseRheXml(await file.text());
-			const code = receiptCode(parsed);
-			if (parsed.series && code.toUpperCase() !== receiptCode(receipt).toUpperCase()) {
-				return `Este XML es del recibo ${code}, no del ${receiptCode(receipt)}.`;
+			const document = await remote.uploadDocument(id, kind, file);
+			const receipt = this.find(id);
+			if (receipt) {
+				this.#put({
+					...receipt,
+					documents: [...receipt.documents.filter((d) => d.kind !== kind), document]
+				});
 			}
 			return null;
 		} catch (error) {
-			return error instanceof RheXmlError ? error.message : 'No se pudo leer el archivo.';
+			return messageFor(error);
 		}
 	}
 
-	#save(): void {
-		saveJson(ITEMS_KEY, $state.snapshot(this.items));
+	async detach(id: string, kind: DocumentKind): Promise<void> {
+		await remote.deleteDocument(id, kind);
+		const receipt = this.find(id);
+		if (receipt)
+			this.#put({ ...receipt, documents: receipt.documents.filter((d) => d.kind !== kind) });
+	}
+
+	read(id: string, kind: DocumentKind): Promise<Blob> {
+		return remote.documentContent(id, kind);
+	}
+
+	downloadUrl(id: string, kind: DocumentKind): Promise<string> {
+		return remote.documentUrl(id, kind, true);
+	}
+
+	/** Forget everything (on sign out: the next person must not see it). */
+	clear(): void {
+		this.byYear = {};
+		this.byId = {};
+		this.limits = {};
+		this.years = [];
+	}
+
+	/** Puts a receipt in its year (and out of any other), keeping newest first. */
+	#put(receipt: Receipt): void {
+		this.#drop(receipt.id);
+		this.byId[receipt.id] = receipt;
+		const year = yearOf(receipt);
+		if (!this.years.includes(year)) this.years = [...this.years, year].sort((a, b) => b - a);
+		const list = this.byYear[year];
+		if (!list) return;
+		this.byYear[year] = [...list, receipt].sort(
+			(a, b) => b.issueDate.localeCompare(a.issueDate) || Number(b.number) - Number(a.number)
+		);
+	}
+
+	#drop(id: string): void {
+		delete this.byId[id];
+		for (const [year, list] of Object.entries(this.byYear)) {
+			if (list.some((r) => r.id === id))
+				this.byYear[Number(year)] = list.filter((r) => r.id !== id);
+		}
 	}
 }
 

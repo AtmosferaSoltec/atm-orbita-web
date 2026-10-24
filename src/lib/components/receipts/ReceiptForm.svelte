@@ -26,6 +26,7 @@
 		type ReceiptSource
 	} from '#lib/domain/receipts.ts';
 	import type { ParsedReceipt } from '#lib/domain/rhe-xml.ts';
+	import { messageFor } from '#lib/api/errors.ts';
 	import { receipts } from '#lib/stores/receipts.svelte.ts';
 	import { toasts } from '#lib/stores/toasts.svelte.ts';
 
@@ -33,7 +34,8 @@
 		initial?: Receipt;
 		submitLabel: string;
 		/** `files` only when creating: the uploaded XML and the optional PDF. */
-		onsubmit: (draft: ReceiptDraft, files: Partial<Record<DocumentKind, File>>) => void;
+		/** Throwing shows the error; the form stays as it is. */
+		onsubmit: (draft: ReceiptDraft, files: Partial<Record<DocumentKind, File>>) => Promise<void>;
 	}
 
 	let { initial, submitLabel, onsubmit }: Props = $props();
@@ -59,6 +61,7 @@
 	let xmlNotice = $state<string | null>(null);
 	let xmlFile = $state<File | null>(null);
 	let pdfFile = $state<File | null>(null);
+	let saving = $state(false);
 
 	const gross = $derived(parseAmount(grossText) ?? 0);
 	// The XML brings the exact withholding; typed receipts use 8%.
@@ -93,7 +96,7 @@
 		toasts.success('Leímos el XML. Revisa los datos y guarda.');
 	}
 
-	function submit(event: SubmitEvent) {
+	async function submit(event: SubmitEvent) {
 		event.preventDefault();
 		const draft: ReceiptDraft = {
 			series: series.trim().toUpperCase(),
@@ -106,7 +109,7 @@
 			collectedOn: collected ? collectedOn : null,
 			source
 		};
-		const error = validateReceipt(draft, receipts.items, initial?.id);
+		const error = validateReceipt(draft, receipts.loaded, initial?.id);
 		if (error) {
 			toasts.error(error);
 			return;
@@ -114,7 +117,14 @@
 		const files: Partial<Record<DocumentKind, File>> = {};
 		if (source === 'xml' && xmlFile) files.xml = xmlFile;
 		if (pdfFile) files.pdf = pdfFile;
-		onsubmit(draft, files);
+		saving = true;
+		try {
+			await onsubmit(draft, files);
+		} catch (failure) {
+			toasts.error(messageFor(failure));
+		} finally {
+			saving = false;
+		}
 	}
 
 	async function pickPdf(file: File) {
@@ -295,7 +305,7 @@
 					</div>
 				</dl>
 				<p class="mt-4 text-[13px] text-muted">Para el tope anual cuenta el monto bruto.</p>
-				<Button type="submit" size="lg" block class="mt-6">{submitLabel}</Button>
+				<Button type="submit" size="lg" block class="mt-6" loading={saving}>{submitLabel}</Button>
 			</Card>
 		</aside>
 	{/if}

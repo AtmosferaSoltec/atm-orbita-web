@@ -1,5 +1,5 @@
-// Files attached to a record (the receipt's XML and its optional PDF). The metadata lives with the
-// record; the bytes live in object storage under `storageKey` (Cloudflare R2 once the API exists).
+// Files attached to a receipt (its XML and its optional PDF). The API keeps the bytes in
+// Cloudflare R2; the web only sees what it shows.
 
 export type DocumentKind = 'xml' | 'pdf';
 
@@ -8,9 +8,6 @@ export interface StoredDocument {
 	kind: DocumentKind;
 	fileName: string;
 	size: number;
-	contentType: string;
-	/** Object key, laid out as in R2: `receipts/{receiptId}/{documentId}.{kind}`. */
-	storageKey: string;
 	uploadedAt: string;
 }
 
@@ -23,19 +20,6 @@ export const DOCUMENT_ACCEPT: Record<DocumentKind, string> = {
 	xml: '.xml,text/xml,application/xml',
 	pdf: '.pdf,application/pdf'
 };
-
-export const CONTENT_TYPE: Record<DocumentKind, string> = {
-	xml: 'application/xml',
-	pdf: 'application/pdf'
-};
-
-export function receiptDocumentKey(
-	receiptId: string,
-	documentId: string,
-	kind: DocumentKind
-): string {
-	return `receipts/${receiptId}/${documentId}.${kind}`;
-}
 
 /** First problem with a file chosen for `kind`, or null. Checks name and size, not content. */
 export function validateDocumentFile(

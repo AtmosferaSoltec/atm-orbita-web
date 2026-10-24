@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { Button, Modal, MoneyField } from '#lib/components/ui/index.ts';
 	import { parseAmount, toInputValue } from '#lib/domain/money.ts';
+	import { messageFor } from '#lib/api/errors.ts';
 	import { receipts } from '#lib/stores/receipts.svelte.ts';
 	import { toasts } from '#lib/stores/toasts.svelte.ts';
 
@@ -13,6 +14,7 @@
 
 	let value = $state('');
 	let error = $state<string | null>(null);
+	let saving = $state(false);
 
 	$effect(() => {
 		if (open) {
@@ -21,15 +23,22 @@
 		}
 	});
 
-	function save() {
+	async function save() {
 		const limit = parseAmount(value);
 		if (!limit) {
 			error = 'Escribe un monto mayor que cero.';
 			return;
 		}
-		receipts.setLimit(year, limit);
-		open = false;
-		toasts.success(`Tope de ${year} actualizado.`);
+		saving = true;
+		try {
+			await receipts.setLimit(year, limit);
+			open = false;
+			toasts.success(`Tope de ${year} actualizado.`);
+		} catch (failure) {
+			error = messageFor(failure);
+		} finally {
+			saving = false;
+		}
 	}
 </script>
 
@@ -42,6 +51,6 @@
 	<MoneyField label="Tope anual" bind:value {error} />
 	{#snippet footer()}
 		<Button variant="secondary" block onclick={() => (open = false)}>Cancelar</Button>
-		<Button block onclick={save}>Guardar</Button>
+		<Button block loading={saving} onclick={save}>Guardar</Button>
 	{/snippet}
 </Modal>

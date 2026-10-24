@@ -1,10 +1,8 @@
 import { loans } from './loans.svelte';
-import { receipts } from './receipts.svelte';
 import { services } from './services.svelte';
 
-/** Puts back the sample data of the three modules. */
+/** Puts back the sample data of the modules that are still mockups (loans, services). */
 export function resetDemoData(): void {
-	receipts.reset();
 	loans.reset();
 	services.reset();
 }
