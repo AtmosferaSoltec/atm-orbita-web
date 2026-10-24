@@ -1,0 +1,83 @@
+@import 'tailwindcss';
+@import '@fontsource-variable/manrope';
+
+/* Design tokens shared with the Android app (atm-orbita-android, ui/theme and ORBITA_SPEC §5). */
+@theme {
+	--font-sans: 'Manrope Variable', ui-sans-serif, system-ui, sans-serif;
+
+	--color-canvas: #f3f5f7;
+	--color-surface: #ffffff;
+	--color-ink: #0e1a2b;
+	--color-muted: #5b6778;
+	--color-muted-light: #94a0b2;
+	--color-outline: #e3e8ee;
+	--color-divider: #eef1f5;
+	--color-chip-border: #cbd3de;
+
+	--color-primary: #1d4ed8;
+	--color-primary-dark: #1e40af;
+	--color-primary-soft: #e8eefd;
+	--color-income: #2ead5b;
+	--color-income-strong: #1f8a45;
+	--color-income-soft: #e6f6ec;
+	--color-expense: #e53935;
+	--color-expense-strong: #c62828;
+	--color-expense-soft: #fdecea;
+	--color-neutral: #3b4a60;
+	--color-neutral-soft: #eef1f5;
+	--color-transfer: #0ea5e9;
+	--color-transfer-soft: #e0f2fe;
+	--color-orange: #f97316;
+	--color-orange-strong: #c2410c;
+	--color-orange-soft: #ffedd5;
+	--color-violet: #7c3aed;
+	--color-violet-soft: #ede9fe;
+
+	--radius-field: 14px;
+	--radius-button: 18px;
+	--radius-card: 20px;
+	--radius-pill: 22px;
+	--radius-hero: 28px;
+
+	--shadow-card: 0 1px 2px rgb(14 26 43 / 0.04), 0 4px 16px rgb(14 26 43 / 0.04);
+	--shadow-pop: 0 12px 40px rgb(14 26 43 / 0.16);
+}
+
+@layer base {
+	html {
+		color-scheme: light;
+	}
+
+	body {
+		@apply bg-canvas font-sans text-ink antialiased;
+		font-feature-settings: 'tnum' 0;
+	}
+
+	:focus-visible {
+		@apply outline-2 outline-offset-2 outline-primary;
+	}
+}
+
+@layer components {
+	/* Highlighted card: violet → blue → teal, cyan glow top right, dark veil to the bottom. */
+	.hero-savings {
+		background:
+			radial-gradient(120% 90% at 100% 0%, rgb(103 232 249 / 0.3), transparent 55%),
+			radial-gradient(90% 80% at 0% 100%, rgb(59 29 143 / 0.45), transparent 60%),
+			linear-gradient(135deg, #3b1d8f 0%, #1d4ed8 52%, #0e7490 100%);
+	}
+
+	.hero-credit {
+		background:
+			radial-gradient(120% 90% at 100% 0%, rgb(255 255 255 / 0.45), transparent 55%),
+			linear-gradient(135deg, #fde047 0%, #fbbf24 50%, #f59e0b 100%);
+	}
+
+	.hero-veil {
+		background: linear-gradient(180deg, rgb(0 0 0 / 0) 0%, rgb(0 0 0 / 0.55) 100%);
+	}
+
+	.tabular {
+		font-variant-numeric: tabular-nums;
+	}
+}
