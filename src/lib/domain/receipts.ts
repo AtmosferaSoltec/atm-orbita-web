@@ -43,6 +43,16 @@ export interface ClientTotal {
 	count: number;
 }
 
+export interface MonthTotal {
+	month: string;
+	gross: Cents;
+	/** Gross of receipts where the client withheld the 8%. */
+	grossWithheld: Cents;
+	/** Gross of receipts paid in full, without withholding. */
+	grossNotWithheld: Cents;
+	count: number;
+}
+
 export interface YearSummary {
 	year: number;
 	count: number;
@@ -54,7 +64,7 @@ export interface YearSummary {
 	remaining: Cents;
 	usedPercent: number;
 	level: LimitLevel;
-	byMonth: { month: string; gross: Cents; count: number }[];
+	byMonth: MonthTotal[];
 	byClient: ClientTotal[];
 }
 
@@ -95,7 +105,15 @@ export function summarizeYear(receipts: Receipt[], year: number, limit: Cents): 
 	const byMonth = Array.from({ length: 12 }, (_, i) => {
 		const key = monthKey(year, i + 1);
 		const inMonth = ofYear.filter((r) => r.issueDate.startsWith(key));
-		return { month: key, gross: sum(inMonth.map((r) => r.gross)), count: inMonth.length };
+		const grossWithheld = sum(inMonth.filter((r) => r.withholding > 0).map((r) => r.gross));
+		const gross = sum(inMonth.map((r) => r.gross));
+		return {
+			month: key,
+			gross,
+			grossWithheld,
+			grossNotWithheld: gross - grossWithheld,
+			count: inMonth.length
+		};
 	});
 
 	const clients = new Map<string, ClientTotal>();

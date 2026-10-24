@@ -63,7 +63,8 @@ export function seedReceipts(): Receipt[] {
 		receipt(51, '2026-08-28', INKA, 300000, 'App móvil Android - segunda entrega'),
 		receipt(52, '2026-09-04', ANDES, 350000, 'Desarrollo web - septiembre 2026'),
 		receipt(53, '2026-09-30', KALLPA, 150000, 'Revisión de código y capacitación', {
-			collectedOn: null
+			collectedOn: null,
+			withholding: false
 		}),
 		receipt(54, '2026-10-05', ANDES, 350000, 'Desarrollo web - octubre 2026', { collectedOn: null })
 	];

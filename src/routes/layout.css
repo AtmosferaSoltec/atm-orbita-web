@@ -33,6 +33,10 @@
 	--color-violet: #7c3aed;
 	--color-violet-soft: #ede9fe;
 
+	/* Receipts chart: validated pair (dataviz validator, light surface). */
+	--color-chart-withheld: #1d4ed8;
+	--color-chart-not-withheld: #d97706;
+
 	--radius-field: 14px;
 	--radius-button: 18px;
 	--radius-card: 20px;

@@ -1,49 +1,90 @@
 <script lang="ts">
-	import { formatMoney, type Cents } from '#lib/domain/money.ts';
+	import { formatMoney } from '#lib/domain/money.ts';
 	import { formatMonth, MONTH_INITIALS, monthShortName, parts } from '#lib/domain/dates.ts';
+	import type { MonthTotal } from '#lib/domain/receipts.ts';
 
 	interface Props {
 		/** 12 months, January first. */
-		data: { month: string; gross: Cents; count: number }[];
-		/** Months after this one are drawn as not yet happened. */
+		data: MonthTotal[];
+		/** Months after this one have not happened yet. */
 		currentMonth: string;
 		label: string;
 	}
 
 	let { data, currentMonth, label }: Props = $props();
 
+	// Two series, validated together (light surface, CVD-safe): blue = withheld, amber = not withheld.
+	const SERIES = [
+		{ key: 'grossWithheld', label: 'Con retención del 8 %', color: 'bg-chart-withheld' },
+		{ key: 'grossNotWithheld', label: 'Sin retención', color: 'bg-chart-not-withheld' }
+	] as const;
+
 	let hovered = $state<number | null>(null);
 	const max = $derived(Math.max(...data.map((d) => d.gross), 1));
+
+	function height(value: number): string {
+		return `${value ? Math.max((value / max) * 100, 2) : 0}%`;
+	}
 </script>
 
-<!-- Single series: one color, no legend; the title names it. A table carries the same data. -->
 <figure class="relative">
+	<ul class="mb-5 flex flex-wrap gap-x-5 gap-y-2" aria-label="Leyenda">
+		{#each SERIES as series (series.key)}
+			<li class="flex items-center gap-2 text-[13px] font-semibold text-neutral">
+				<span class="size-3 rounded-[3px] {series.color}" aria-hidden="true"></span>
+				{series.label}
+			</li>
+		{/each}
+	</ul>
+
 	<div class="flex h-44 items-end gap-1.5 border-b border-outline sm:gap-2.5" aria-hidden="true">
 		{#each data as item, i (item.month)}
-			{@const future = item.month > currentMonth}
+			{@const top = item.grossNotWithheld ? 'grossNotWithheld' : 'grossWithheld'}
 			<div
 				role="presentation"
-				class="group relative flex h-full flex-1 items-end justify-center"
+				class="relative flex h-full flex-1 items-end justify-center"
 				onmouseenter={() => (hovered = i)}
 				onmouseleave={() => (hovered = null)}
 			>
+				<!-- Stacked from the baseline; 2px surface gap between segments, rounded top only. -->
 				<div
-					class="w-full max-w-7 rounded-t-[4px] transition-colors {future
-						? 'bg-neutral-soft'
-						: hovered === i
-							? 'bg-primary-dark'
-							: 'bg-primary'}"
-					style="height:{item.gross ? Math.max((item.gross / max) * 100, 3) : 0}%"
-				></div>
-				{#if hovered === i}
+					class="flex h-full w-full max-w-7 flex-col-reverse gap-[2px] transition-opacity {hovered !==
+						null && hovered !== i
+						? 'opacity-50'
+						: ''}"
+				>
+					{#each SERIES as series (series.key)}
+						{#if item[series.key] > 0}
+							<div
+								class="w-full {series.color} {series.key === top ? 'rounded-t-[4px]' : ''}"
+								style="height:{height(item[series.key])}"
+							></div>
+						{/if}
+					{/each}
+				</div>
+				{#if hovered === i && item.count > 0}
 					<div
-						class="pointer-events-none absolute bottom-full z-10 mb-2 rounded-xl bg-ink px-3 py-2 text-xs whitespace-nowrap text-white shadow-pop"
+						class="pointer-events-none absolute bottom-full z-10 mb-2 rounded-xl bg-ink px-3 py-2.5 text-xs whitespace-nowrap text-white shadow-pop {i >
+						8
+							? 'right-0'
+							: i < 3
+								? 'left-0'
+								: ''}"
 					>
 						<p class="font-bold">{formatMonth(item.month)}</p>
-						<p class="tabular text-white/80">
+						<p class="tabular mt-0.5 text-white/80">
 							{formatMoney(item.gross)} · {item.count}
 							{item.count === 1 ? 'recibo' : 'recibos'}
 						</p>
+						<dl class="tabular mt-2 flex flex-col gap-1 border-t border-white/15 pt-2">
+							{#each SERIES as series (series.key)}
+								<div class="flex items-center gap-2">
+									<span class="size-2.5 rounded-[2px] {series.color}" aria-hidden="true"></span>
+									<dt class="flex-1 text-white/80">{series.label}</dt>
+									<dd class="pl-3 font-bold">{formatMoney(item[series.key])}</dd>
+								</div>
+							{/each}
+						</dl>
 					</div>
 				{/if}
 			</div>
@@ -61,15 +102,25 @@
 			</span>
 		{/each}
 	</div>
+
 	<table class="sr-only">
 		<caption>{label}</caption>
-		<thead><tr><th>Mes</th><th>Monto bruto</th><th>Recibos</th></tr></thead>
+		<thead>
+			<tr>
+				<th>Mes</th>
+				<th>Monto bruto</th>
+				{#each SERIES as series (series.key)}<th>{series.label}</th>{/each}
+				<th>Recibos</th>
+			</tr>
+		</thead>
 		<tbody>
 			{#each data as item (item.month)}
-				<tr
-					><td>{formatMonth(item.month)}</td><td>{formatMoney(item.gross)}</td><td>{item.count}</td
-					></tr
-				>
+				<tr>
+					<td>{formatMonth(item.month)}</td>
+					<td>{formatMoney(item.gross)}</td>
+					{#each SERIES as series (series.key)}<td>{formatMoney(item[series.key])}</td>{/each}
+					<td>{item.count}</td>
+				</tr>
 			{/each}
 		</tbody>
 	</table>

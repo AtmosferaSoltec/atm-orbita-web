@@ -32,7 +32,12 @@ describe('summarizeYear', () => {
 		expect(summary.usedPercent).toBe(82);
 		expect(summary.level).toBe('warning');
 		expect(summary.remaining).toBe(900000);
-		expect(summary.byMonth[2].gross).toBe(2000000);
+		expect(summary.byMonth[2]).toMatchObject({
+			gross: 2000000,
+			grossWithheld: 2000000,
+			grossNotWithheld: 0
+		});
+		expect(summary.byMonth[4]).toMatchObject({ grossWithheld: 0, grossNotWithheld: 2100000 });
 		expect(summary.byClient).toHaveLength(1);
 	});
 });
