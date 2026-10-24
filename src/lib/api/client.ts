@@ -4,6 +4,7 @@
 // browser sees a single origin.
 
 import { ApiError, NETWORK_ERROR, type FieldProblem } from './errors';
+import { withSessionLock } from './session-lock';
 
 const BASE = '/api/v1';
 const SESSION_HEADERS = { 'X-Session-Transport': 'cookie' };
@@ -31,7 +32,7 @@ export function whenSessionLost(callback: () => void): void {
 
 /** Renews the access token with the cookie. Only one renewal runs at a time. */
 export function refreshSession(): Promise<boolean> {
-	refreshing ??= (async () => {
+	refreshing ??= withSessionLock(async () => {
 		try {
 			const res = await fetch(`${BASE}/auth/refresh`, {
 				method: 'POST',
@@ -50,7 +51,7 @@ export function refreshSession(): Promise<boolean> {
 		} finally {
 			refreshing = null;
 		}
-	})();
+	});
 	return refreshing;
 }
 
@@ -102,7 +103,9 @@ async function toError(res: Response): Promise<ApiError> {
 
 /** Sends a request; on 401 renews the session once and retries. */
 async function request(path: string, options: RequestOptions = {}): Promise<Response> {
-	let res = await send(path, options);
+	let res = await (path.startsWith('/auth/') && options.method === 'POST'
+		? withSessionLock(() => send(path, options))
+		: send(path, options));
 	if (res.status === 401 && options.auth !== false) {
 		if (await refreshSession()) {
 			res = await send(path, options);

@@ -17,8 +17,9 @@ Plus: landing (`/`), login, register, forgot password (3 steps, like Android) an
 | Loans, services, public loan link | Still **mockups** on sample data in `localStorage` (`src/lib/data/seed.ts`)                               |
 | Dashboard                         | Receipts real; loans and services from the mockups                                                        |
 
-- **Session:** the access token lives only in memory (`src/lib/api/client.ts`); the refresh token is an `HttpOnly`, `SameSite=Strict` cookie that JavaScript never sees (header `X-Session-Transport: cookie`, API plan 17). On load, the app renews the session and asks `/me` (`session.ensureReady()`); a 401 renews once and retries.
+- **Session:** the access token lives only in memory (`src/lib/api/client.ts`); the refresh token is an `HttpOnly`, `SameSite=Strict` cookie that JavaScript never sees (header `X-Session-Transport: cookie`, API plan 17). On load, the app renews the session and asks `/me` (`session.ensureReady()`); a 401 renews once and retries. New web sessions use 90-day renewable refresh tokens (API `WEB_REFRESH_TOKEN_TTL_DAYS`); existing/native sessions keep their policy. Web Locks serialize cookie rotations across tabs.
 - **Files:** uploaded through the API (it checks them), downloaded with short-lived signed R2 URLs, and shown inside the page through `…/documents/:kind/content` (the R2 key cannot set CORS on the bucket; see API plan 18, deviations).
+- **Google sign-in:** login/register use Google Identity Services when the API returns a configured client ID from `/auth/google/config` (API plan 19). Google credentials stay in memory. An existing password account confirms its password once to link. The API supplies all provider configuration; no frontend `.env` or build arguments. Live account testing requires the owner’s OAuth web client ID. See `../atm-orbita-api/docs/plans/19-google-sign-in.md` for setup and deployment.
 - **Register asks for a name** (optional in the API, so Android keeps working without it).
 
 ## Running it locally
@@ -103,5 +104,6 @@ pnpm check        # types (svelte-check)
 pnpm lint         # prettier + eslint
 pnpm format       # format
 npx vitest run --project server   # domain tests
+pnpm exec playwright test         # Google and session flows (mock provider/API)
 pnpm build        # static build in build/
 ```

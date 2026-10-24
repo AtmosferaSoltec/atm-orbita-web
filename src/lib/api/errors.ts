@@ -20,6 +20,13 @@ export class ApiError extends Error {
 export const NETWORK_ERROR = 'NETWORK';
 
 const MESSAGES: Record<string, string> = {
+	GOOGLE_UNAVAILABLE: 'El acceso con Google no está disponible en este momento.',
+	GOOGLE_INVALID: 'No pudimos verificar tu cuenta de Google. Vuelve a continuar con Google.',
+	GOOGLE_CHALLENGE_EXPIRED: 'El intento de acceso venció. Vuelve a continuar con Google.',
+	GOOGLE_LINK_REQUIRED: 'Confirma tu contraseña de Orbita para vincular Google.',
+	GOOGLE_IDENTITY_CONFLICT:
+		'Tu cuenta ya tiene otra cuenta de Google vinculada. Usa esa cuenta o ingresa con contraseña.',
+
 	INVALID_CREDENTIALS: 'Correo o contraseña incorrectos.',
 	EMAIL_ALREADY_REGISTERED: 'Ese correo ya tiene una cuenta. Inicia sesión.',
 	RESET_CODE_INVALID: 'El código no es válido o ya venció. Pide uno nuevo.',

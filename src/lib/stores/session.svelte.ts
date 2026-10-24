@@ -46,6 +46,10 @@ class SessionStore {
 		this.user = await auth.login(email, password);
 	}
 
+	async signInWithGoogle(credential: string, mainCurrency: string, password = ''): Promise<void> {
+		this.user = await auth.loginWithGoogle(credential, mainCurrency, password);
+	}
+
 	async register(input: auth.RegisterInput): Promise<void> {
 		this.user = await auth.register(input);
 	}

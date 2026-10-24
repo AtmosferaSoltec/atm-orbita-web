@@ -7,3 +7,6 @@ bun.lockb
 
 # Miscellaneous
 /static/
+
+# nginx syntax; Prettier interprets .inc as Markdown and corrupts directives.
+/deploy/security-headers.inc

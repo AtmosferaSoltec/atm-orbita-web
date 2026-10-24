@@ -1,4 +1,5 @@
 <script lang="ts">
+	import GoogleSignIn from '#lib/components/auth/GoogleSignIn.svelte';
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
@@ -91,6 +92,8 @@
 
 	<Button type="submit" size="lg" block {loading}>Crear cuenta</Button>
 </form>
+
+<GoogleSignIn mainCurrency={currency} />
 
 <p class="mt-6 text-center text-sm text-muted">
 	¿Ya tienes cuenta?

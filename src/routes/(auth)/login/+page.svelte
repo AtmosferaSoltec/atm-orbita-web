@@ -1,4 +1,5 @@
 <script lang="ts">
+	import GoogleSignIn from '#lib/components/auth/GoogleSignIn.svelte';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
@@ -63,6 +64,8 @@
 
 	<Button type="submit" size="lg" block {loading}>Ingresar</Button>
 </form>
+
+<GoogleSignIn />
 
 <p class="mt-6 text-center text-sm text-muted">
 	¿No tienes cuenta?

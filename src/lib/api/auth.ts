@@ -37,6 +37,19 @@ export function login(email: string, password: string): Promise<AccountUser> {
 	return openSession('/auth/login', { email, password });
 }
 
+export function loginWithGoogle(
+	credential: string,
+	mainCurrency: string,
+	password = ''
+): Promise<AccountUser> {
+	return openSession('/auth/google', {
+		credential,
+		password,
+		main_currency: mainCurrency,
+		timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+	});
+}
+
 export function register(input: RegisterInput): Promise<AccountUser> {
 	return openSession('/auth/register', {
 		name: input.name,

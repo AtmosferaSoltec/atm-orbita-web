@@ -12,3 +12,5 @@ pnpm dev                                        # web on :5173
 Sample XML to try the upload: `src/lib/domain/fixtures/rhe-sample.xml`.
 
 Conventions, structure and status: [CLAUDE.md](CLAUDE.md).
+
+Google sign-in uses the API's runtime configuration. The owner must configure an OAuth web client in Google Cloud and set `GOOGLE_WEB_CLIENT_ID` on the API; no web environment variable is required. Setup and deployment instructions: [Google sign-in plan](../atm-orbita-api/docs/plans/19-google-sign-in.md). Run `pnpm exec playwright test` for the simulated Google and multi-tab session flows.
