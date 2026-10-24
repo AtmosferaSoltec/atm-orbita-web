@@ -14,6 +14,7 @@
 	let { open = $bindable(), title, description, size = 'md', footer, children }: Props = $props();
 
 	const SIZES = { sm: 'max-w-sm', md: 'max-w-lg', lg: 'max-w-4xl' };
+	const titleId = $props.id();
 
 	let dialog: HTMLDialogElement | undefined = $state();
 
@@ -32,13 +33,13 @@
 	class="m-auto w-[calc(100%-2rem)] rounded-hero bg-surface p-0 text-ink shadow-pop backdrop:bg-ink/40 backdrop:backdrop-blur-[2px] {SIZES[
 		size
 	]}"
-	aria-labelledby="modal-title"
+	aria-labelledby={titleId}
 >
 	{#if open}
 		<div class="p-6">
 			<div class="flex items-start gap-3">
 				<div class="min-w-0 flex-1">
-					<h2 id="modal-title" class="text-lg font-extrabold">{title}</h2>
+					<h2 id={titleId} class="text-lg font-extrabold">{title}</h2>
 					{#if description}<p class="mt-1 text-sm text-muted">{description}</p>{/if}
 				</div>
 				<button
