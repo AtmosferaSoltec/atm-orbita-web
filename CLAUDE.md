@@ -75,10 +75,25 @@ src/routes/
 7. Error texts come from the API's `code` (`messageFor` in `src/lib/api/errors.ts`), never from its `message`.
 8. If something is ambiguous, ask; don't make up business rules.
 
-## Branches
+## Branches and deploy
 
-- All work goes to **`develop`**. Moving to `main` is the user's call.
-- Commits in Conventional Commits, in English, one per logical change.
+| Branch       | Purpose                                                                       |
+| ------------ | ----------------------------------------------------------------------------- |
+| `develop`    | All the work.                                                                 |
+| `main`       | What already works, promoted from `develop`.                                  |
+| `production` | Pushing here runs `.github/workflows/deploy.yml` and publishes to the server. |
+
+The flow is always `develop` → `main` → `production`, and **promoting is the user's call**. The workflow refuses a commit that is not in `main`. Commits in Conventional Commits, in English, one per logical change.
+
+The workflow has three jobs: **check** (lint, types, tests, build), **build-and-push** (the image is built in GitHub and published to `ghcr.io/atmosferasoltec/atm-orbita-web`, never on the server) and **deploy** (copies `deploy/docker-compose.yml` to `/opt/orbita-web` and starts the new image, waiting for it to be `healthy`). It uses the repo secrets `SSH_HOST`, `SSH_USER` and `SSH_KEY`.
+
+On the server (`ssh atmosfera`):
+
+- `https://orbita.atmosferast.com` → host nginx (`/etc/nginx/sites-available/orbita.atmosferast.com`, wildcard origin certificate) → container `orbita-web` on `127.0.0.1:3070`.
+- The container is nginx serving the static build and forwarding `/api` to the `orbita-api` container over `atm-network` (`deploy/nginx.conf`). One origin: the session cookie is first-party and no CORS is needed.
+- `/opt/orbita-web` belongs to the `deploy` user. **There is no `.env`**: the web has no configuration or secrets.
+- **The web needs the API deployed with the receipts module** (`atm-orbita-api`, plans 17 and 18); promote the API first.
+- Rollback: rerun the workflow (`workflow_dispatch`) on an older commit, or on the server `cd /opt/orbita-web && IMAGE_TAG=sha-<older> docker compose up -d`.
 
 ## Commands
 

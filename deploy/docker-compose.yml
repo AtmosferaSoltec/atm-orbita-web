@@ -1,0 +1,30 @@
+# Production stack of the web. GitHub Actions copies it to /opt/orbita-web on each
+# deploy; it is not edited by hand on the server.
+#
+# It never builds: the image is compiled once in CI and published to GHCR.
+# The web has no configuration or secrets: it is static and forwards /api to the
+# API container (orbita-api, on `atm-network`), see deploy/nginx.conf. That is why
+# there is no .env here.
+#
+# The HEALTHCHECK comes with the image (Dockerfile) and asks for /healthz.
+
+networks:
+  shared:
+    name: atm-network
+    external: true
+
+services:
+  app:
+    image: ghcr.io/atmosferasoltec/atm-orbita-web:${IMAGE_TAG:-latest}
+    container_name: orbita-web
+    # Loopback only: the host nginx is what publishes it.
+    ports:
+      - '127.0.0.1:3070:8080'
+    networks:
+      - shared
+    restart: unless-stopped
+    security_opt: ['no-new-privileges:true']
+    deploy:
+      resources:
+        limits:
+          memory: 128m
