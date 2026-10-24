@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { parseRheXml, RheXmlError } from './rhe-xml';
 
 // Same shape as a real SUNAT RHE, with fictional data and an 8% withholding.
-const withWithholding = readFileSync('static/examples/rhe-sample.xml', 'utf8');
+const withWithholding = readFileSync('src/lib/domain/fixtures/rhe-sample.xml', 'utf8');
 
 // A real receipt without withholding: TaxAmount and the RET 4TA subtotal are 0.00.
 const withoutWithholding = withWithholding

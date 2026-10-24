@@ -7,6 +7,6 @@ pnpm install
 pnpm dev
 ```
 
-Open http://localhost:5173, sign in with any email and a password of 8+ characters. To try the XML upload: `static/examples/rhe-sample.xml`.
+Open http://localhost:5173, sign in with any email and a password of 8+ characters. Sample XML to try the upload: `src/lib/domain/fixtures/rhe-sample.xml`.
 
 Conventions, structure and status: [CLAUDE.md](CLAUDE.md).

@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
-	import { asset } from '$app/paths';
 	import { Building2, CalendarDays, FileDigit, Hash } from '@lucide/svelte';
 	import {
 		Button,
@@ -110,7 +109,11 @@
 	}
 </script>
 
-<form class="grid gap-6 lg:grid-cols-[1fr_320px]" onsubmit={submit} novalidate>
+<form
+	class="grid gap-6 {showForm ? 'lg:grid-cols-[1fr_320px]' : 'max-w-3xl'}"
+	onsubmit={submit}
+	novalidate
+>
 	<div class="flex flex-col gap-6">
 		{#if !initial}
 			<SegmentedControl
@@ -119,7 +122,7 @@
 				block
 				options={[
 					{ value: 'xml', label: 'Subir XML' },
-					{ value: 'manual', label: 'Escribir a mano' }
+					{ value: 'manual', label: 'Manual' }
 				]}
 			/>
 		{/if}
@@ -129,16 +132,6 @@
 			{#if xmlNotice}
 				<p class="rounded-2xl bg-orange-soft px-4 py-3 text-sm font-semibold text-orange-strong">
 					{xmlNotice}
-				</p>
-			{/if}
-			{#if !showForm}
-				<p class="text-center text-[13px] text-muted">
-					¿No tienes un XML a la mano?
-					<a
-						href={asset('examples/rhe-sample.xml')}
-						download
-						class="font-bold text-primary hover:underline">Descarga uno de ejemplo</a
-					>
 				</p>
 			{/if}
 		{/if}
