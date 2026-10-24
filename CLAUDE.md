@@ -10,10 +10,28 @@ Plus: landing (`/`), login, register, forgot password (3 steps, like Android) an
 
 ## Status (24 Oct 2026)
 
-- **Mockups only**: everything runs on sample data in memory + `localStorage` (`src/lib/data/seed.ts`). There is **no connection to the API** yet, and nothing in `atm-orbita-api` or `atm-orbita-android` is touched from here.
-- The demo session lets in any email and a password of 8+ characters.
-- Receipt files (XML and optional PDF) are kept in the browser's IndexedDB through `src/lib/data/document-storage.ts`. Keys follow the R2 layout (`receipts/{receiptId}/{documentId}.{xml|pdf}`). With the API, that file becomes the Cloudflare R2 implementation: the API signs upload/download URLs and the browser never holds R2 credentials.
-- The public loan link only works in the same browser for now (it reads the local demo data). With the API it will be a public endpoint by token.
+| Part                              | State                                                                                                     |
+| --------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| Login, register, forgot password  | **Real**, against `atm-orbita-api` (the same accounts as the Android app; plans 01, 11 and 17 of the API) |
+| Receipts (`/receipts`)            | **Real**: data in the API's database, XML and PDF in Cloudflare R2 (API plan 18)                          |
+| Loans, services, public loan link | Still **mockups** on sample data in `localStorage` (`src/lib/data/seed.ts`)                               |
+| Dashboard                         | Receipts real; loans and services from the mockups                                                        |
+
+- **Session:** the access token lives only in memory (`src/lib/api/client.ts`); the refresh token is an `HttpOnly`, `SameSite=Strict` cookie that JavaScript never sees (header `X-Session-Transport: cookie`, API plan 17). On load, the app renews the session and asks `/me` (`session.ensureReady()`); a 401 renews once and retries.
+- **Files:** uploaded through the API (it checks them), downloaded with short-lived signed R2 URLs, and shown inside the page through `…/documents/:kind/content` (the R2 key cannot set CORS on the bucket; see API plan 18, deviations).
+- **Register asks for a name** (optional in the API, so Android keeps working without it).
+
+## Running it locally
+
+Web and API run on this machine; only the database is on the VPS, through an SSH tunnel.
+
+```bash
+ssh -N -L 15432:127.0.0.1:5432 atmosfera      # 1. tunnel to the VPS database (leave it open)
+cd ../atm-orbita-api && scripts/dev.sh         # 2. API on http://localhost:3071 (reads its .env)
+pnpm dev                                       # 3. web on http://localhost:5173
+```
+
+Vite proxies `/api` to the API (`API_PROXY_TARGET`, default `http://localhost:3071`), so the browser sees one origin: the session cookie is first-party and no CORS is needed. Migrations of the server database are applied from the API with `scripts/dev.sh migrate up`.
 
 ## Language rule (non-negotiable)
 
@@ -26,14 +44,15 @@ Plus: landing (`/`), login, register, forgot password (3 steps, like Android) an
 - SvelteKit 3 + Svelte 5 (runes), TypeScript, SPA (`ssr = false`, `adapter-static` with `fallback: 'index.html'`).
 - Tailwind CSS 4: design tokens in `src/routes/layout.css` (`@theme`), copied from Android (`ui/theme`, `ORBITA_SPEC §5`).
 - Manrope font (`@fontsource-variable/manrope`), icons from `@lucide/svelte`.
-- Vitest (domain rules), Playwright (installed, no e2e tests yet).
+- Vitest (domain rules), Playwright (used for end-to-end checks against the local API).
 
 ## Structure
 
 ```
+src/lib/api/          API client (client.ts: tokens, renewal, errors), auth.ts, receipts.ts; errors.ts maps codes to Spanish.
 src/lib/domain/       Pure rules (TS, no Svelte): money, dates, receipts, loans, services, rhe-xml. With tests (*.spec.ts).
-src/lib/data/         Demo persistence (storage.ts), file storage (document-storage.ts) and sample data (seed.ts).
-src/lib/stores/       State with runes (*.svelte.ts). The only place to swap for API calls.
+src/lib/data/         Mockup persistence (storage.ts) and sample data for loans and services (seed.ts).
+src/lib/stores/       State with runes (*.svelte.ts). session and receipts talk to the API; loans and services are mockups.
 src/lib/components/
   ui/                 Reusable design-system components (Button, Card, TextField, Modal, HeroCard…).
   layout/             AppShell (sidebar on desktop, bottom bar on mobile), UserMenu, FloatingCards.
@@ -53,7 +72,8 @@ src/routes/
 4. Validation messages: the first problem only, same style as Android (`ORBITA_SPEC §4.1`).
 5. Links with `resolve()` from `$app/paths` using **route IDs with the group**: `resolve('/(app)/loans/[id]', { id })`.
 6. Imports through `#lib/...` **with the extension**: `#lib/domain/money.ts`, `#lib/stores/loans.svelte.ts`.
-7. If something is ambiguous, ask; don't make up business rules.
+7. Error texts come from the API's `code` (`messageFor` in `src/lib/api/errors.ts`), never from its `message`.
+8. If something is ambiguous, ask; don't make up business rules.
 
 ## Branches
 

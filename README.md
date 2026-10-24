@@ -1,12 +1,14 @@
 # Orbita · Web
 
-Web app for Orbita with three modules: **receipts (recibos por honorarios)** against the yearly cap, **loans** with a read-only public link, and **shared services**. Mockups with sample data for now; it does not connect to the API yet.
+Web app for Orbita, with the same accounts as the Android app. **Receipts (recibos por honorarios)** against the yearly cap, with their XML and PDF, work against the real API; **loans** and **shared services** are still mockups with sample data.
 
 ```bash
 pnpm install
-pnpm dev
+ssh -N -L 15432:127.0.0.1:5432 atmosfera        # database on the VPS
+(cd ../atm-orbita-api && scripts/dev.sh)        # API on :3071
+pnpm dev                                        # web on :5173
 ```
 
-Open http://localhost:5173, sign in with any email and a password of 8+ characters. Sample XML to try the upload: `src/lib/domain/fixtures/rhe-sample.xml`.
+Sample XML to try the upload: `src/lib/domain/fixtures/rhe-sample.xml`.
 
 Conventions, structure and status: [CLAUDE.md](CLAUDE.md).
