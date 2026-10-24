@@ -1,36 +1,66 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { Mail, User } from '@lucide/svelte';
-	import { Button, FormAlert, PasswordField, TextField } from '#lib/components/ui/index.ts';
+	import {
+		Button,
+		FormAlert,
+		PasswordField,
+		SelectField,
+		TextField
+	} from '#lib/components/ui/index.ts';
+	import { currencies, type CurrencyOption } from '#lib/api/auth.ts';
+	import { messageFor } from '#lib/api/errors.ts';
 	import { session } from '#lib/stores/session.svelte.ts';
-	import { simulateRequest, validateEmail, validatePassword } from '../validation';
+	import { regionCurrency, validateEmail, validateName, validatePassword } from '../validation';
 
+	// While the catalog loads (or if it fails) the two main currencies are enough.
+	let options = $state<CurrencyOption[]>([
+		{ code: 'PEN', symbol: 'S/', name: 'Soles' },
+		{ code: 'USD', symbol: 'US$', name: 'Dólares' }
+	]);
 	let name = $state('');
 	let email = $state('');
 	let password = $state('');
+	let currency = $state('PEN');
 	let error = $state<string | null>(null);
 	let loading = $state(false);
 
+	onMount(async () => {
+		try {
+			options = await currencies();
+		} catch {
+			// keep the fallback list
+		}
+		currency = regionCurrency(options.map((o) => o.code));
+	});
+
 	async function submit(event: SubmitEvent) {
 		event.preventDefault();
-		error =
-			(name.trim() ? null : 'Escribe tu nombre.') ??
-			(name.length > 60 ? 'El nombre puede tener hasta 60 caracteres.' : null) ??
-			validateEmail(email) ??
-			validatePassword(password);
+		error = validateName(name) ?? validateEmail(email) ?? validatePassword(password);
 		if (error) return;
 		loading = true;
-		await simulateRequest();
-		session.register(name, email.trim());
-		await goto(resolve('/(app)/dashboard'), { replaceState: true });
+		try {
+			await session.register({
+				name: name.trim(),
+				email: email.trim(),
+				password,
+				mainCurrency: currency
+			});
+			await goto(resolve('/(app)/dashboard'), { replaceState: true });
+		} catch (failure) {
+			error = messageFor(failure);
+		} finally {
+			loading = false;
+		}
 	}
 </script>
 
 <svelte:head><title>Crea tu cuenta · Orbita</title></svelte:head>
 
 <h1 class="text-[26px] font-extrabold tracking-tight">Crea tu cuenta</h1>
-<p class="mt-1 text-muted">Empieza a llevar el control en menos de un minuto.</p>
+<p class="mt-1 text-muted">Sirve para la web y para la app de Orbita.</p>
 
 <form class="mt-7 flex flex-col gap-4" onsubmit={submit} novalidate>
 	<TextField
@@ -50,6 +80,12 @@
 		autocomplete="email"
 	/>
 	<PasswordField bind:value={password} autocomplete="new-password" hint="Mínimo 8 caracteres." />
+	<SelectField
+		label="Moneda"
+		bind:value={currency}
+		options={options.map((o) => ({ value: o.code, label: `${o.name} (${o.symbol})` }))}
+		hint="Es la moneda de tus cuentas en la app. Podrás cambiarla después en Ajustes."
+	/>
 
 	<FormAlert message={error} />
 

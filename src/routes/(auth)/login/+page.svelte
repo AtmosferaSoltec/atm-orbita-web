@@ -4,8 +4,9 @@
 	import { page } from '$app/state';
 	import { Mail } from '@lucide/svelte';
 	import { Button, FormAlert, PasswordField, TextField } from '#lib/components/ui/index.ts';
+	import { messageFor } from '#lib/api/errors.ts';
 	import { session } from '#lib/stores/session.svelte.ts';
-	import { simulateRequest, validateEmail, validatePassword } from '../validation';
+	import { validateEmail, validatePassword } from '../validation';
 
 	let email = $state('');
 	let password = $state('');
@@ -19,16 +20,21 @@
 		error = validateEmail(email) ?? validatePassword(password);
 		if (error) return;
 		loading = true;
-		await simulateRequest();
-		session.signIn(email.trim());
-		await goto(resolve('/(app)/dashboard'), { replaceState: true });
+		try {
+			await session.signIn(email.trim(), password);
+			await goto(resolve('/(app)/dashboard'), { replaceState: true });
+		} catch (failure) {
+			error = messageFor(failure);
+		} finally {
+			loading = false;
+		}
 	}
 </script>
 
 <svelte:head><title>Inicia sesión · Orbita</title></svelte:head>
 
 <h1 class="text-[26px] font-extrabold tracking-tight">Inicia sesión</h1>
-<p class="mt-1 text-muted">Entra para ver tus recibos, préstamos y servicios.</p>
+<p class="mt-1 text-muted">Usa la misma cuenta que en la app de Orbita.</p>
 
 <form class="mt-7 flex flex-col gap-4" onsubmit={submit} novalidate>
 	<TextField
@@ -62,7 +68,4 @@
 	¿No tienes cuenta?
 	<a href={resolve('/(auth)/register')} class="font-bold text-primary hover:underline">Regístrate</a
 	>
-</p>
-<p class="mt-3 text-center text-xs text-muted-light">
-	Maqueta: cualquier correo y contraseña de 8 caracteres entran.
 </p>

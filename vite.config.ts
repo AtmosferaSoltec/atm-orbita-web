@@ -4,7 +4,16 @@ import tailwindcss from '@tailwindcss/vite';
 import adapter from '@sveltejs/adapter-static';
 import { sveltekit } from '@sveltejs/kit/vite';
 
+// The browser only talks to this origin: /api goes to the Orbita API (run it
+// locally with atm-orbita-api/scripts/dev.sh). Same origin = the session cookie
+// is first-party and no CORS is needed.
+const apiProxy = {
+	'/api': { target: process.env.API_PROXY_TARGET ?? 'http://localhost:3071', changeOrigin: true }
+};
+
 export default defineConfig({
+	server: { proxy: apiProxy },
+	preview: { proxy: apiProxy },
 	plugins: [
 		tailwindcss(),
 		sveltekit({

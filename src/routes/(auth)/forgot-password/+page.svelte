@@ -3,9 +3,12 @@
 	import { resolve } from '$app/paths';
 	import { KeyRound, Mail } from '@lucide/svelte';
 	import { Button, FormAlert, PasswordField, TextField } from '#lib/components/ui/index.ts';
-	import { simulateRequest, validateEmail, validatePassword } from '../validation';
+	import { forgotPassword, resetPassword, verifyResetCode } from '#lib/api/auth.ts';
+	import { messageFor } from '#lib/api/errors.ts';
+	import { validateEmail, validatePassword } from '../validation';
 
-	// Three steps, as in the Android app (ORBITA_SPEC §7.1): email → 6-digit code → new password.
+	// Three steps, as in the Android app (ORBITA_SPEC §7.1, API plan 11):
+	// email → 6-digit code → new password.
 	type Step = 'email' | 'code' | 'password';
 
 	let step = $state<Step>('email');
@@ -33,22 +36,37 @@
 		step = next;
 	}
 
+	function validate(): string | null {
+		if (step === 'email') return validateEmail(email);
+		if (step === 'code') return /^\d{6}$/.test(code) ? null : 'Escribe los 6 dígitos del código.';
+		return (
+			validatePassword(password) ?? (password === repeat ? null : 'Las contraseñas no coinciden.')
+		);
+	}
+
 	async function submit(event: SubmitEvent) {
 		event.preventDefault();
-		if (step === 'email') error = validateEmail(email);
-		if (step === 'code') error = /^\d{6}$/.test(code) ? null : 'Escribe los 6 dígitos del código.';
-		if (step === 'password')
-			error =
-				validatePassword(password) ??
-				(password === repeat ? null : 'Las contraseñas no coinciden.');
+		error = validate();
 		if (error) return;
-
 		loading = true;
-		await simulateRequest();
-		loading = false;
-		if (step === 'email') go('code');
-		else if (step === 'code') go('password');
-		else await goto(resolve('/(auth)/login?password-changed'), { replaceState: true });
+		try {
+			if (step === 'email') {
+				// The API answers the same whether the email exists or not.
+				await forgotPassword(email.trim());
+				code = '';
+				go('code');
+			} else if (step === 'code') {
+				await verifyResetCode(email.trim(), code);
+				go('password');
+			} else {
+				await resetPassword(email.trim(), code, password);
+				await goto(resolve('/(auth)/login?password-changed'), { replaceState: true });
+			}
+		} catch (failure) {
+			error = messageFor(failure);
+		} finally {
+			loading = false;
+		}
 	}
 </script>
 
@@ -84,7 +102,7 @@
 			autocomplete="one-time-code"
 			maxlength={6}
 			oninput={() => (code = code.replace(/\D/g, ''))}
-			hint="Maqueta: no llega ningún correo; sirve cualquier código de 6 dígitos."
+			hint="¿No llega? Revisa el correo no deseado o pide otro código."
 		/>
 	{:else}
 		<PasswordField

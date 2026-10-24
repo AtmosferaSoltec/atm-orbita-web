@@ -23,7 +23,7 @@
 	}
 
 	async function signOut() {
-		session.signOut();
+		await session.signOut();
 		await goto(resolve('/(auth)/login'));
 	}
 </script>
@@ -38,10 +38,10 @@
 		aria-expanded={open}
 		onclick={() => (open = !open)}
 	>
-		<Avatar name={session.user?.name ?? '?'} size={compact ? 'sm' : 'md'} />
+		<Avatar name={session.displayName || '?'} size={compact ? 'sm' : 'md'} />
 		{#if !compact}
 			<span class="min-w-0 flex-1">
-				<span class="block truncate text-sm font-bold">{session.user?.name}</span>
+				<span class="block truncate text-sm font-bold">{session.displayName}</span>
 				<span class="block truncate text-xs text-muted">{session.user?.email}</span>
 			</span>
 		{/if}
@@ -80,7 +80,7 @@
 <ConfirmDialog
 	bind:open={confirmReset}
 	title="¿Restablecer los datos de ejemplo?"
-	text="Se perderán los recibos, préstamos y servicios que agregaste o cambiaste en esta maqueta."
+	text="Se perderán los préstamos y servicios que agregaste o cambiaste en la maqueta. Tus recibos no se tocan: esos ya son reales."
 	confirmLabel="Restablecer"
 	onconfirm={() => {
 		resetDemoData();
