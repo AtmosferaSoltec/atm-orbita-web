@@ -1,69 +1,69 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
+	import { ChevronRight } from '@lucide/svelte';
 	import { Avatar, Badge, Card, ProgressBar } from '#lib/components/ui/index.ts';
 	import { formatMoney } from '#lib/domain/money.ts';
-	import { formatDate, formatMonth } from '#lib/domain/dates.ts';
-	import type { Loan, LoanSummary } from '#lib/domain/loans.ts';
-	import { LOAN_STATUS } from './labels';
-
-	interface Props {
-		loan: Loan;
-		summary: LoanSummary;
-	}
-
-	let { loan, summary }: Props = $props();
-	const status = $derived(LOAN_STATUS[summary.status]);
+	import { formatMonth, todayIso, toMonthKey } from '#lib/domain/dates.ts';
+	import { balancesOf, monthlyLoanSummary, hasDebt, type Debtor } from '#lib/domain/loans.ts';
+	let { debtor }: { debtor: Debtor } = $props();
+	const balances = $derived(balancesOf(debtor));
+	const active = $derived(hasDebt(debtor));
+	const current = $derived(
+		monthlyLoanSummary(debtor).find((m) => m.month === toMonthKey(todayIso()))
+	);
 </script>
 
-<Card href={resolve('/(app)/loans/[id]', { id: loan.id })} class="h-full">
-	<div class="flex items-start gap-3.5">
-		<Avatar name={loan.borrower.name} />
+<Card href={resolve('/(app)/loans/[id]', { id: debtor.id })} class="h-full">
+	<div class="flex items-center gap-3">
+		<Avatar name={debtor.name} />
 		<div class="min-w-0 flex-1">
-			<p class="truncate text-[15px] font-extrabold">{loan.borrower.name}</p>
-			<p class="text-[13px] text-muted">Prestado el {formatDate(loan.lentOn)}</p>
+			<h2 class="truncate font-extrabold">{debtor.name}</h2>
+			<p class="mt-0.5 text-xs text-muted">
+				{debtor.currency === 'PEN' ? 'Soles' : 'Dólares'} · {debtor.movements.filter(
+					(m) => m.kind === 'loan'
+				).length}
+				{debtor.movements.filter((m) => m.kind === 'loan').length === 1
+					? 'préstamo registrado'
+					: 'préstamos registrados'}
+			</p>
 		</div>
-		<Badge tone={status.tone}>{status.label}</Badge>
+		<Badge tone={active ? 'orange' : balances.length ? 'income' : 'neutral'}
+			>{active ? 'Por cobrar' : balances.length ? 'Saldado' : 'Sin préstamos'}</Badge
+		>
 	</div>
-
-	<div class="mt-5 flex items-end justify-between gap-3">
-		<div>
-			<p class="text-[13px] font-bold text-muted">Te falta cobrar</p>
-			<p class="tabular text-2xl font-extrabold">{formatMoney(summary.balance, loan.currency)}</p>
-		</div>
-		<p class="tabular pb-1 text-right text-[13px] text-muted">
-			de {formatMoney(loan.principal, loan.currency)}
-		</p>
+	<div class="mt-5 space-y-4">
+		{#each balances as balance (balance.currency)}
+			<div>
+				<div class="flex items-end justify-between gap-2">
+					<div>
+						<p class="text-xs font-semibold text-muted">
+							Saldo en {balance.currency === 'PEN' ? 'soles' : 'dólares'}
+						</p>
+						<p class="tabular mt-1 text-2xl font-extrabold">
+							{formatMoney(balance.balance, balance.currency)}
+						</p>
+					</div>
+					<p class="tabular text-xs text-muted">de {formatMoney(balance.lent, balance.currency)}</p>
+				</div>
+				<div class="mt-2">
+					<ProgressBar value={balance.progressPercent} label="Porcentaje devuelto" />
+				</div>
+			</div>
+		{:else}
+			<p class="rounded-2xl bg-canvas p-4 text-sm text-muted">
+				Su ficha está lista. Añade el primer préstamo.
+			</p>
+		{/each}
 	</div>
-	<div class="mt-3">
-		<ProgressBar
-			value={summary.progressPercent}
-			tone={summary.status === 'overdue' ? 'expense' : 'income'}
-			label="Avance del pago"
-		/>
-	</div>
-
-	<p
-		class="mt-4 text-[13px] font-semibold {summary.status === 'overdue'
-			? 'text-expense-strong'
-			: 'text-muted'}"
+	<div
+		class="mt-5 flex items-center justify-between gap-2 border-t border-divider pt-3 text-xs font-semibold text-muted"
 	>
-		{#if summary.status === 'completed'}
-			Terminó de pagar · último pago {summary.lastPayment
-				? formatDate(summary.lastPayment.date)
-				: ''}
-		{:else if summary.status === 'overdue'}
-			{summary.overdueCount}
-			{summary.overdueCount === 1 ? 'cuota atrasada' : 'cuotas atrasadas'} · {formatMoney(
-				summary.overdueAmount,
-				loan.currency
-			)}
-		{:else if summary.status === 'not-started'}
-			Empieza a pagar en {formatMonth(loan.firstDueMonth).toLowerCase()}
-		{:else if summary.nextInstallment}
-			Próxima cuota: {formatMoney(
-				summary.nextInstallment.amount - summary.nextInstallment.covered,
-				loan.currency
-			)} el {formatDate(summary.nextInstallment.dueDate)}
-		{/if}
-	</p>
+		<span
+			>{#if current?.expected}{formatMonth(current.month)} · falta {formatMoney(
+					current.remaining,
+					debtor.currency
+				)}{:else}Reparto por meses · abonos flexibles{/if}</span
+		>
+		<ChevronRight size={16} aria-hidden="true" />
+	</div>
 </Card>

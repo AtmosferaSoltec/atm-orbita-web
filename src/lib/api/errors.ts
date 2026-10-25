@@ -20,6 +20,11 @@ export class ApiError extends Error {
 export const NETWORK_ERROR = 'NETWORK';
 
 const MESSAGES: Record<string, string> = {
+	DEBTOR_CURRENCY_LOCKED: 'La moneda del deudor es fija. Crea otra ficha para usar otra moneda.',
+	LOAN_KIND_LOCKED: 'No se puede cambiar un préstamo por un abono ni al revés.',
+	LOAN_BALANCE_EXCEEDED:
+		'Los abonos no pueden superar lo prestado en esa fecha. Actualiza la ficha y revisa los montos.',
+
 	SERVICE_CURRENCY_LOCKED: 'La moneda no se puede cambiar mientras existan pagos registrados.',
 	GOOGLE_UNAVAILABLE: 'El acceso con Google no está disponible en este momento.',
 	GOOGLE_INVALID: 'No pudimos verificar tu cuenta de Google. Vuelve a continuar con Google.',
@@ -46,6 +51,16 @@ const MESSAGES: Record<string, string> = {
 };
 
 const FIELD_MESSAGES: Record<string, string> = {
+	DEBTOR_NAME_REQUIRED: 'Escribe el nombre de la persona.',
+	LOAN_DATE_INVALID: 'Elige una fecha válida hasta hoy.',
+	LOAN_PAYMENT_MONTH_INVALID: 'Elige el mes al que corresponde el abono.',
+	LOAN_PLAN_INVALID: 'Revisa el reparto mensual del préstamo.',
+	LOAN_PLAN_MONTH_INVALID: 'Elige meses válidos y no repitas un mes en el mismo préstamo.',
+	LOAN_PLAN_EXCEEDS_TOTAL: 'El reparto no puede superar el total de este préstamo.',
+	LOAN_TITLE_TOO_LONG: 'El concepto puede tener hasta 100 caracteres.',
+	LOAN_KIND_INVALID: 'Elige un préstamo o un abono.',
+	LOAN_TOTAL_TOO_LARGE: 'El total supera el monto permitido.',
+
 	SERVICE_NAME_REQUIRED: 'Escribe un nombre para el servicio.',
 	SERVICE_COLOR_INVALID: 'Elige un color para el servicio.',
 	BILLING_DAY_INVALID: 'Elige un día de cobro entre 1 y 31.',

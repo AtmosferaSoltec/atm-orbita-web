@@ -1,12 +1,9 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import { LogOut, RotateCcw } from '@lucide/svelte';
+	import { LogOut } from '@lucide/svelte';
 	import Avatar from '../ui/Avatar.svelte';
-	import ConfirmDialog from '../ui/ConfirmDialog.svelte';
 	import { session } from '#lib/stores/session.svelte.ts';
-	import { resetDemoData } from '#lib/stores/demo.ts';
-	import { toasts } from '#lib/stores/toasts.svelte.ts';
 
 	interface Props {
 		compact?: boolean;
@@ -15,7 +12,6 @@
 	let { compact = false }: Props = $props();
 
 	let open = $state(false);
-	let confirmReset = $state(false);
 	let root: HTMLDivElement | undefined = $state();
 
 	function onWindowClick(event: MouseEvent) {
@@ -57,17 +53,6 @@
 			<button
 				role="menuitem"
 				type="button"
-				class="flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-semibold hover:bg-neutral-soft"
-				onclick={() => {
-					open = false;
-					confirmReset = true;
-				}}
-			>
-				<RotateCcw size={17} class="text-muted" /> Restablecer datos de ejemplo
-			</button>
-			<button
-				role="menuitem"
-				type="button"
 				class="flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-semibold text-expense-strong hover:bg-expense-soft"
 				onclick={signOut}
 			>
@@ -76,14 +61,3 @@
 		</div>
 	{/if}
 </div>
-
-<ConfirmDialog
-	bind:open={confirmReset}
-	title="¿Restablecer los datos de ejemplo?"
-	text="Se restablecerán los préstamos de ejemplo. Tus recibos y servicios guardados seguirán disponibles."
-	confirmLabel="Restablecer"
-	onconfirm={() => {
-		resetDemoData();
-		toasts.success('Datos de ejemplo restablecidos.');
-	}}
-/>

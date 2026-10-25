@@ -1,85 +1,112 @@
-// Sample data for the modules that are still mockups (loans), around October 2026.
+import type { Debtor, LoanMovement } from '#lib/domain/loans.ts';
 
-import type { Loan, LoanPayment } from '#lib/domain/loans.ts';
-
-const CREATED = '2026-01-01T12:00:00.000Z';
-
-function payments(entries: [string, number][]): LoanPayment[] {
-	return entries.map(([date, amount], i) => ({ id: `lp-${date}-${i}`, date, amount, note: '' }));
-}
-
-export function seedLoans(): Loan[] {
+export function seedLoans(): Debtor[] {
+	const movements: LoanMovement[] = [
+		{
+			id: 'g-a',
+			kind: 'loan',
+			currency: 'PEN',
+			amount: 300000,
+			date: '2026-08-01',
+			note: 'Celular',
+			plan: ['2026-08', '2026-09', '2026-10', '2026-11', '2026-12', '2027-01'].map((month) => ({
+				month,
+				amount: 50000
+			}))
+		},
+		{
+			id: 'g-b',
+			kind: 'loan',
+			currency: 'PEN',
+			amount: 200000,
+			date: '2026-09-03',
+			note: 'Laptop',
+			plan: [
+				{ month: '2026-09', amount: 50000 },
+				{ month: '2026-10', amount: 20000 },
+				{ month: '2026-11', amount: 65000 },
+				{ month: '2026-12', amount: 65000 }
+			]
+		},
+		{
+			id: 'g-c',
+			kind: 'loan',
+			currency: 'PEN',
+			amount: 100000,
+			date: '2026-09-12',
+			note: 'Gastos personales',
+			plan: [
+				{ month: '2026-10', amount: 10000 },
+				{ month: '2026-11', amount: 45000 },
+				{ month: '2026-12', amount: 45000 }
+			]
+		},
+		{
+			id: 'g-p1',
+			kind: 'payment',
+			currency: 'PEN',
+			amount: 50000,
+			date: '2026-09-30',
+			note: 'Por Yape',
+			appliedMonth: '2026-09'
+		},
+		{
+			id: 'g-p2',
+			kind: 'payment',
+			currency: 'PEN',
+			amount: 50000,
+			date: '2026-10-15',
+			note: 'Abono de quincena',
+			appliedMonth: '2026-10'
+		}
+	];
 	return [
 		{
-			id: 'l-adriel',
-			borrower: { name: 'Adriel Ramos', phone: '987 654 321' },
+			id: 'd-gerson',
+			name: 'Gerson',
 			currency: 'PEN',
-			principal: 500000,
-			lentOn: '2026-09-15',
-			firstDueMonth: '2027-02',
-			installment: 50000,
-			dueDay: 5,
-			note: 'Para el inicial de su moto. Empieza a pagar en febrero.',
-			publicToken: 'demo-adriel-7Qm2',
-			payments: [],
-			createdAt: CREATED
+			movements,
+			reference: null,
+			publicToken: 'demo-gerson',
+			createdAt: '2026-08-01T12:00:00Z'
 		},
 		{
-			id: 'l-carla',
-			borrower: { name: 'Carla Méndez', phone: '912 345 678' },
-			currency: 'PEN',
-			principal: 240000,
-			lentOn: '2026-03-01',
-			firstDueMonth: '2026-04',
-			installment: 40000,
-			dueDay: 10,
-			note: 'Curso de inglés.',
-			publicToken: 'demo-carla-k3Pz',
-			payments: payments([
-				['2026-04-10', 40000],
-				['2026-05-12', 40000],
-				['2026-06-10', 40000],
-				['2026-07-15', 40000],
-				['2026-09-02', 40000]
-			]),
-			createdAt: CREATED
-		},
-		{
-			id: 'l-diego',
-			borrower: { name: 'Diego Salazar', phone: '' },
+			id: 'd-diego',
+			name: 'Diego Salazar',
 			currency: 'USD',
-			principal: 120000,
-			lentOn: '2026-06-20',
-			firstDueMonth: '2026-07',
-			installment: 20000,
-			dueDay: 25,
-			note: 'Laptop para trabajar.',
-			publicToken: 'demo-diego-W8nx',
-			payments: payments([
-				['2026-07-25', 20000],
-				['2026-08-24', 20000],
-				['2026-09-25', 20000]
-			]),
-			createdAt: CREATED
+			movements: [
+				{
+					id: 'd-a',
+					kind: 'loan',
+					currency: 'USD',
+					amount: 120000,
+					date: '2026-06-20',
+					note: 'Laptop para trabajar'
+				},
+				{
+					id: 'd-p',
+					kind: 'payment',
+					currency: 'USD',
+					amount: 60000,
+					date: '2026-10-01',
+					note: 'Transferencia'
+				}
+			],
+			reference: null,
+			publicToken: 'demo-diego',
+			createdAt: '2026-06-20T12:00:00Z'
 		},
 		{
-			id: 'l-rosa',
-			borrower: { name: 'Rosa Huamán', phone: '' },
+			id: 'd-rosa',
+			name: 'Rosa Huamán',
 			currency: 'PEN',
-			principal: 80000,
-			lentOn: '2026-01-08',
-			firstDueMonth: '2026-02',
-			installment: 20000,
-			dueDay: 8,
-			note: '',
-			publicToken: 'demo-rosa-b1Lc',
-			payments: payments([
-				['2026-02-08', 20000],
-				['2026-03-08', 20000],
-				['2026-04-09', 20000],
-				['2026-05-08', 20000]
-			]),
-			createdAt: CREATED
+			movements: [
+				{ id: 'r-a', kind: 'loan', currency: 'PEN', amount: 80000, date: '2026-01-08', note: '' },
+				{ id: 'r-p', kind: 'payment', currency: 'PEN', amount: 80000, date: '2026-05-08', note: '' }
+			],
+			reference: null,
+			publicToken: 'demo-rosa',
+			createdAt: '2026-01-08T12:00:00Z'
 		}
 	];
 }

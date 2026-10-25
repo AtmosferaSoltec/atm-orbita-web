@@ -39,11 +39,11 @@
 			icon: HandCoins,
 			tone: 'income',
 			title: 'Préstamos',
-			text: 'Presta, define la cuota y el mes de inicio, y registra cada pago.',
+			text: 'Organiza lo que prestas por persona y registra abonos de cualquier monto.',
 			points: [
-				'Cronograma con cuotas atrasadas',
+				'Total prestado, devuelto y pendiente',
 				'Pagos de cualquier monto',
-				'Enlace público de solo lectura'
+				'Vista previa de su estado de cuenta'
 			]
 		},
 		{
@@ -68,12 +68,12 @@
 		{
 			icon: BellRing,
 			title: 'Revisa tus alertas',
-			text: 'El inicio te dice cuánto te queda del tope, qué cuota venció y qué cobro se acerca.'
+			text: 'El inicio te dice cuánto te queda del tope, qué pago esperas y qué cobro se acerca.'
 		},
 		{
 			icon: Link2,
-			title: 'Comparte sin dar acceso',
-			text: 'Quien te debe ve su cronograma con un enlace, sin poder cambiar nada.'
+			title: 'Consulta cada cuenta',
+			text: 'Previsualiza el saldo y los movimientos de cada persona en una vista de solo lectura.'
 		}
 	];
 </script>
@@ -178,7 +178,7 @@
 				<div class="flex items-center gap-3">
 					<IconBadge icon={HandCoins} tone="income" size="sm" />
 					<div class="min-w-0 flex-1">
-						<p class="text-sm font-bold">Diego pagó su cuota 3 de 6</p>
+						<p class="text-sm font-bold">Diego hizo un abono de US$ 200</p>
 						<p class="text-xs text-muted">Préstamo · 25 sep</p>
 					</div>
 					<p class="tabular font-extrabold text-income-strong">+US$ 200.00</p>

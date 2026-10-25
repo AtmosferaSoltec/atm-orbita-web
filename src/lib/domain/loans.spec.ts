@@ -1,84 +1,249 @@
 import { describe, expect, it } from 'vitest';
-import { buildSchedule, summarizeLoan, validatePayment, type Loan } from './loans';
-
-function loan(overrides: Partial<Loan> = {}): Loan {
+import {
+	balancesOf,
+	hasDebt,
+	migrateLegacyLoans,
+	migrateDebtorCurrencies,
+	validateDebtorName,
+	validateLedger,
+	validateMovement,
+	validatePlan,
+	monthlyLoanSummary,
+	unplannedAmount,
+	unassignedPayments,
+	type Debtor,
+	type LoanMovement,
+	type MovementDraft
+} from './loans';
+function entry(
+	amount: number,
+	kind: 'loan' | 'payment' = 'loan',
+	currency: 'PEN' | 'USD' = 'PEN',
+	date = '2026-10-01'
+): LoanMovement {
 	return {
-		id: 'l1',
-		borrower: { name: 'Adriel', phone: '' },
-		currency: 'PEN',
-		principal: 500000,
-		lentOn: '2026-01-10',
-		firstDueMonth: '2026-02',
-		installment: 50000,
-		dueDay: 15,
+		id: `${kind}-${amount}-${currency}-${date}`,
+		kind,
+		currency,
+		amount,
+		date,
 		note: '',
-		publicToken: 't',
-		payments: [],
-		createdAt: '2026-01-10T00:00:00Z',
-		...overrides
+		appliedMonth: kind === 'payment' ? date.slice(0, 7) : undefined
 	};
 }
-
-describe('buildSchedule', () => {
-	it('creates fixed installments and a smaller last one', () => {
-		const schedule = buildSchedule(loan({ principal: 520000 }), '2026-01-20');
-		expect(schedule).toHaveLength(11);
-		expect(schedule[0]).toMatchObject({ month: '2026-02', dueDate: '2026-02-15', amount: 50000 });
-		expect(schedule.at(-1)?.amount).toBe(20000);
+function debtor(movements: LoanMovement[] = []): Debtor {
+	return {
+		id: 'g',
+		name: 'Gerson',
+		currency: movements[0]?.currency ?? 'PEN',
+		movements,
+		reference: null,
+		publicToken: 'preview',
+		createdAt: '2026-01-01'
+	};
+}
+describe('flexible debtor ledger', () => {
+	it('creates a person before any money is lent', () => {
+		expect(balancesOf(debtor())).toEqual([]);
+		expect(hasDebt(debtor())).toBe(false);
+		expect(validateDebtorName(' Gerson ')).toBeNull();
+		expect(validateDebtorName(' ')).toBeTruthy();
 	});
-
-	it('uses the last day of short months', () => {
-		const schedule = buildSchedule(loan({ dueDay: 31 }), '2026-01-20');
-		expect(schedule[0].dueDate).toBe('2026-02-28');
-	});
-
-	it('applies payments oldest installment first', () => {
-		const payments = [
-			{ id: 'p1', date: '2026-02-15', amount: 50000, note: '' },
-			{ id: 'p2', date: '2026-03-20', amount: 70000, note: '' }
-		];
-		const schedule = buildSchedule(loan({ payments }), '2026-05-01');
-		expect(schedule.map((i) => i.status).slice(0, 5)).toEqual([
-			'paid',
-			'paid',
-			'overdue',
-			'upcoming',
-			'upcoming'
+	it('combines three advances and arbitrary repayments without installments', () => {
+		const person = debtor([
+			entry(300000),
+			entry(200000),
+			entry(100000),
+			entry(50000, 'payment'),
+			entry(50000, 'payment'),
+			entry(100000, 'payment')
 		]);
-		expect(schedule[2].covered).toBe(20000);
+		expect(balancesOf(person)[0]).toMatchObject({
+			lent: 600000,
+			paid: 200000,
+			balance: 400000,
+			loanCount: 3,
+			paymentCount: 3
+		});
+		expect(hasDebt(person)).toBe(true);
+	});
+	it('requires all advances and payments to use the debtor currency', () => {
+		const pen = debtor([entry(300000)]);
+		const usd = debtor([entry(20000, 'loan', 'USD')]);
+		expect(balancesOf(pen)[0].balance).toBe(300000);
+		expect(balancesOf(usd)[0].balance).toBe(20000);
+		for (const kind of ['loan', 'payment'] as const) {
+			expect(validateMovement(pen, entry(10000, kind, 'USD'), undefined, '2026-10-24')).toContain(
+				'moneda del deudor'
+			);
+		}
+	});
+	it('accepts full settlement and a new advance after settlement', () => {
+		const person = debtor([entry(300000), entry(300000, 'payment')]);
+		expect(hasDebt(person)).toBe(false);
+		person.movements.push(entry(200000, 'loan', 'PEN', '2026-10-02'));
+		expect(balancesOf(person)[0].balance).toBe(200000);
+	});
+	it('rejects a backdated repayment before the advance', () => {
+		expect(
+			validateMovement(
+				debtor([entry(100000)]),
+				entry(50000, 'payment', 'PEN', '2026-09-30'),
+				undefined,
+				'2026-10-24'
+			)
+		).toBeTruthy();
+	});
+	it('prevents deleting or reducing advances already covering payments', () => {
+		const advance = entry(100000);
+		const payment = entry(70000, 'payment');
+		expect(validateLedger([payment])).toBeTruthy();
+		expect(
+			validateMovement(
+				debtor([advance, payment]),
+				{ ...advance, amount: 60000 },
+				advance.id,
+				'2026-10-24'
+			)
+		).toBeTruthy();
+		expect(validateLedger([advance])).toBeNull();
+	});
+	it('validates dates, positive cents and safe totals', () => {
+		const base: MovementDraft = entry(100000);
+		for (const change of [
+			{ amount: 0 },
+			{ amount: 1.5 },
+			{ date: '2026-02-30' },
+			{ date: '2026-10-25' },
+			{ amount: Number.MAX_SAFE_INTEGER + 1 }
+		])
+			expect(
+				validateMovement(debtor(), { ...base, ...change }, undefined, '2026-10-24')
+			).toBeTruthy();
+		expect(validateLedger([entry(Number.MAX_SAFE_INTEGER), entry(1)])).toBeTruthy();
+		expect(
+			validateLedger([
+				entry(Number.MAX_SAFE_INTEGER, 'loan', 'PEN', '2026-10-01'),
+				entry(Number.MAX_SAFE_INTEGER, 'payment', 'PEN', '2026-10-02'),
+				entry(1, 'loan', 'PEN', '2026-10-03')
+			])
+		).toBeTruthy();
+	});
+	it('splits previous mixed-currency mockups and preserves the reference without converting money', () => {
+		const person = debtor([entry(300000), entry(50000, 'payment'), entry(20000, 'loan', 'USD')]);
+		person.reference = { date: '2026-11-01', amount: 10000, currency: 'USD' };
+		const people = migrateDebtorCurrencies([person]);
+		expect(people.map((p) => p.currency)).toEqual(['PEN', 'USD']);
+		expect(people.map((p) => p.id)).toEqual(['g', 'g-usd']);
+		expect(people.map((p) => balancesOf(p)[0].balance)).toEqual([250000, 20000]);
+		expect(people[0].reference).toBeNull();
+		expect(people[1].reference).toEqual(person.reference);
+		expect(people[1].publicToken).not.toBe(people[0].publicToken);
+		expect(migrateDebtorCurrencies([debtor()])[0].currency).toBe('PEN');
+	});
+	it('migrates older local records by person, retaining money and dates', () => {
+		const old = {
+			id: 'one',
+			borrower: { name: ' Gerson ' },
+			currency: 'PEN' as const,
+			principal: 300000,
+			lentOn: '2026-09-01',
+			note: 'Celular',
+			publicToken: 'old',
+			createdAt: '2026-09-01',
+			payments: [{ id: 'p', date: '2026-10-01', amount: 50000, note: 'Yape' }]
+		};
+		const people = migrateLegacyLoans([
+			old,
+			{ ...old, id: 'two', borrower: { name: 'gerson' }, principal: 200000, payments: [] },
+			{ ...old, id: 'three', currency: 'USD', principal: 10000, payments: [] }
+		]);
+		expect(people).toHaveLength(2);
+		expect(people.map((p) => p.currency)).toEqual(['PEN', 'USD']);
+		expect(people[0].reference).toBeNull();
+		expect(balancesOf(people[0])[0]).toMatchObject({ lent: 500000, paid: 50000, balance: 450000 });
+		expect(people[0].movements[1]).toMatchObject({ date: '2026-10-01', note: 'Yape' });
 	});
 });
 
-describe('summarizeLoan', () => {
-	it('reports balance, overdue and status', () => {
-		const summary = summarizeLoan(
-			loan({ payments: [{ id: 'p1', date: '2026-02-15', amount: 50000, note: '' }] }),
-			'2026-04-20'
-		);
-		expect(summary.paid).toBe(50000);
-		expect(summary.balance).toBe(450000);
-		expect(summary.overdueCount).toBe(2);
-		expect(summary.overdueAmount).toBe(100000);
-		expect(summary.status).toBe('overdue');
+describe('manually planned months', () => {
+	it('adds different purchases for each month and records a partial payment in the chosen month', () => {
+		const person = debtor([
+			{
+				...entry(300000),
+				plan: [
+					{ month: '2026-10', amount: 50000 },
+					{ month: '2026-11', amount: 50000 }
+				]
+			},
+			{ ...entry(200000), plan: [{ month: '2026-10', amount: 20000 }] },
+			{ ...entry(100000), plan: [{ month: '2026-10', amount: 10000 }] },
+			{ ...entry(50000, 'payment'), appliedMonth: '2026-10' }
+		]);
+		expect(monthlyLoanSummary(person)).toEqual([
+			{ month: '2026-10', expected: 80000, paid: 50000, remaining: 30000, surplus: 0 },
+			{ month: '2026-11', expected: 50000, paid: 0, remaining: 50000, surplus: 0 }
+		]);
+		expect(unplannedAmount(person)).toBe(470000);
+		expect(balancesOf(person)[0].balance).toBe(550000);
 	});
-
-	it('is not started before the first due date', () => {
-		expect(summarizeLoan(loan(), '2026-01-20').status).toBe('not-started');
+	it('keeps an excess payment in the selected month instead of moving it to another month', () => {
+		const person = debtor([
+			{
+				...entry(200000),
+				plan: [
+					{ month: '2026-10', amount: 80000 },
+					{ month: '2026-11', amount: 120000 }
+				]
+			},
+			{ ...entry(100000, 'payment', 'PEN', '2026-10-24'), appliedMonth: '2026-10' }
+		]);
+		expect(monthlyLoanSummary(person)).toEqual([
+			{ month: '2026-10', expected: 80000, paid: 100000, remaining: 0, surplus: 20000 },
+			{ month: '2026-11', expected: 120000, paid: 0, remaining: 120000, surplus: 0 }
+		]);
+		expect(balancesOf(person)[0].balance).toBe(100000);
 	});
-
-	it('is completed when fully paid', () => {
-		const payments = [{ id: 'p1', date: '2026-02-01', amount: 500000, note: '' }];
-		expect(summarizeLoan(loan({ payments }), '2026-02-02').status).toBe('completed');
+	it('uses the applied month even when the received date is in another month or year', () => {
+		const person = debtor([entry(100000), { ...entry(10000, 'payment'), appliedMonth: '2027-01' }]);
+		expect(monthlyLoanSummary(person)[0]).toMatchObject({
+			month: '2027-01',
+			paid: 10000,
+			surplus: 10000
+		});
 	});
-});
-
-describe('validatePayment', () => {
-	it('rejects more than the balance and future dates', () => {
-		expect(validatePayment({ amount: 600, date: '2026-01-01', note: '' }, 500, '2026-02-01')).toBe(
-			'El pago no puede ser mayor que lo que falta pagar.'
-		);
-		expect(validatePayment({ amount: 100, date: '2026-03-01', note: '' }, 500, '2026-02-01')).toBe(
-			'La fecha no puede ser posterior a hoy.'
-		);
+	it('leaves legacy payments unassigned but still reduces the overall balance', () => {
+		const person = debtor([entry(100000), { ...entry(10000, 'payment'), appliedMonth: undefined }]);
+		expect(unassignedPayments(person)).toBe(10000);
+		expect(monthlyLoanSummary(person)).toEqual([]);
+		expect(balancesOf(person)[0].balance).toBe(90000);
+	});
+	it('requires a month for new payments and rejects duplicate, invalid and excessive distributions', () => {
+		expect(
+			validateMovement(
+				debtor([entry(100000)]),
+				{ ...entry(10000, 'payment'), appliedMonth: undefined },
+				undefined,
+				'2026-10-24'
+			)
+		).toContain('mes');
+		expect(validatePlan(100000, [{ month: '2026-13', amount: 10000 }])).toBeTruthy();
+		expect(
+			validatePlan(100000, [
+				{ month: '2026-10', amount: 10000 },
+				{ month: '2026-10', amount: 10000 }
+			])
+		).toBeTruthy();
+		expect(validatePlan(100000, [{ month: '2026-10', amount: 100001 }])).toBeTruthy();
+		expect(validatePlan(100000, [{ month: '2026-10', amount: 0 }])).toBeTruthy();
+		expect(validatePlan(100000, [{ month: '2026-10', amount: 1.5 }])).toBeTruthy();
+		expect(validatePlan(100000, [{ month: '2026-10', amount: 50000 }])).toBeNull();
+		expect(validatePlan(100000, [])).toBeNull();
+	});
+	it('prevents reducing an advance below its existing monthly plan', () => {
+		const advance = { ...entry(100000), plan: [{ month: '2026-10', amount: 100000 }] };
+		expect(
+			validateMovement(debtor([advance]), { ...advance, amount: 50000 }, advance.id, '2026-10-24')
+		).toContain('reparto');
 	});
 });

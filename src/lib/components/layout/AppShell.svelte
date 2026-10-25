@@ -33,11 +33,6 @@
 			{/each}
 		</nav>
 		<div class="mt-auto">
-			<p
-				class="mb-3 rounded-2xl bg-orange-soft px-3 py-2.5 text-xs font-semibold text-orange-strong"
-			>
-				Préstamos aún usa datos de ejemplo.
-			</p>
 			<UserMenu />
 		</div>
 	</aside>

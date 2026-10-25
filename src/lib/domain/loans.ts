@@ -1,160 +1,255 @@
-// Loans without interest: what was lent is what comes back, in fixed monthly installments.
-// Payments can be of any amount; they cover the installments in order (oldest first).
+import { isIsoDate, todayIso, type IsoDate, type MonthKey } from '#lib/domain/dates.ts';
+import { percentOf, type Cents, type Currency } from '#lib/domain/money.ts';
 
-import { percentOf, sum, type Cents, type Currency } from './money';
-import {
-	addMonths,
-	daysBetween,
-	dateInMonth,
-	todayIso,
-	type IsoDate,
-	type MonthKey
-} from './dates';
-
-export const DUE_SOON_DAYS = 7;
-
-export interface Borrower {
-	name: string;
-	phone: string;
-}
-
-export interface LoanPayment {
-	id: string;
-	date: IsoDate;
+export const LOAN_CURRENCIES: Currency[] = ['PEN', 'USD'];
+export type MovementKind = 'loan' | 'payment';
+export interface PlannedAmount {
+	month: MonthKey;
 	amount: Cents;
-	note: string;
 }
-
-export interface Loan {
+export interface LoanMovement {
 	id: string;
-	borrower: Borrower;
+	kind: MovementKind;
+	currency: Currency;
+	amount: Cents;
+	date: IsoDate;
+	note: string;
+	title?: string;
+	plan?: PlannedAmount[];
+	appliedMonth?: MonthKey | null;
+}
+export type MovementDraft = Omit<LoanMovement, 'id'>;
+/** Retained only to display the month of an older local mockup reference. */
+export interface PaymentReference {
+	date: IsoDate | '';
+	amount: Cents | null;
+	currency: Currency;
+}
+export interface Debtor {
+	id: string;
+	name: string;
+	currency: Currency;
+	movements: LoanMovement[];
+	reference: PaymentReference | null;
+	publicToken: string;
+	createdAt: string;
+}
+export interface CurrencyBalance {
+	currency: Currency;
+	lent: Cents;
+	paid: Cents;
+	balance: Cents;
+	progressPercent: number;
+	loanCount: number;
+	paymentCount: number;
+}
+export function balancesOf(debtor: Debtor): CurrencyBalance[] {
+	return LOAN_CURRENCIES.filter((currency) =>
+		debtor.movements.some((m) => m.currency === currency)
+	).map((currency) => {
+		const entries = debtor.movements.filter((m) => m.currency === currency);
+		const lent = entries.filter((m) => m.kind === 'loan').reduce((sum, m) => sum + m.amount, 0);
+		const paid = entries.filter((m) => m.kind === 'payment').reduce((sum, m) => sum + m.amount, 0);
+		return {
+			currency,
+			lent,
+			paid,
+			balance: lent - paid,
+			progressPercent: percentOf(paid, lent),
+			loanCount: entries.filter((m) => m.kind === 'loan').length,
+			paymentCount: entries.filter((m) => m.kind === 'payment').length
+		};
+	});
+}
+export function hasDebt(debtor: Debtor): boolean {
+	return balancesOf(debtor).some((b) => b.balance > 0);
+}
+export function sortedMovements(debtor: Debtor): LoanMovement[] {
+	return debtor.movements.toReversed().sort((a, b) => b.date.localeCompare(a.date));
+}
+export function validateDebtorName(name: string): string | null {
+	if (!name.trim()) return 'Escribe el nombre de la persona.';
+	if (name.trim().length > 60) return 'El nombre puede tener hasta 60 caracteres.';
+	return null;
+}
+/** Check balances in date order; a correction cannot leave a payment without its advance. */
+export function validateLedger(movements: LoanMovement[]): string | null {
+	for (const currency of LOAN_CURRENCIES) {
+		let lent = 0;
+		let paid = 0;
+		const entries = movements
+			.filter((m) => m.currency === currency)
+			.toSorted(
+				(a, b) =>
+					a.date.localeCompare(b.date) || (a.kind === b.kind ? 0 : a.kind === 'loan' ? -1 : 1)
+			);
+		for (const m of entries) {
+			if (m.kind === 'loan') lent += m.amount;
+			else paid += m.amount;
+			const balance = lent - paid;
+			if (!Number.isSafeInteger(lent) || !Number.isSafeInteger(paid))
+				return 'El total supera el monto permitido.';
+			if (balance < 0) return 'Los abonos no pueden superar lo prestado en esa moneda y fecha.';
+		}
+	}
+	return null;
+}
+export function validateMovement(
+	debtor: Debtor,
+	draft: MovementDraft,
+	editingId?: string,
+	today = todayIso()
+): string | null {
+	if (!Number.isSafeInteger(draft.amount) || draft.amount <= 0)
+		return 'Ingresa un monto mayor que cero.';
+	if (draft.currency !== debtor.currency) return 'El movimiento debe usar la moneda del deudor.';
+	if (!isIsoDate(draft.date) || draft.date > today) return 'Elige una fecha válida, hasta hoy.';
+	if ((draft.title?.length ?? 0) > 100) return 'El concepto puede tener hasta 100 caracteres.';
+	if (draft.kind === 'payment' && (!draft.appliedMonth || !isLoanMonth(draft.appliedMonth)))
+		return 'Elige a qué mes corresponde el abono.';
+	if (draft.kind === 'loan') {
+		const planError = validatePlan(draft.amount, draft.plan ?? []);
+		if (planError) return planError;
+	}
+	if (draft.note.length > 500) return 'La nota puede tener hasta 500 caracteres.';
+	return validateLedger([
+		...debtor.movements.filter((m) => m.id !== editingId),
+		{ ...draft, id: editingId ?? 'new' }
+	]);
+}
+// Preserve earlier local mockup records without retaining phones or installment schedules.
+interface LegacyLoan {
+	id: string;
+	borrower: { name: string };
 	currency: Currency;
 	principal: Cents;
 	lentOn: IsoDate;
-	firstDueMonth: MonthKey;
-	installment: Cents;
-	/** Day of the month each installment is due (1–31; short months use their last day). */
-	dueDay: number;
 	note: string;
-	/** Token of the read-only public link. */
 	publicToken: string;
-	payments: LoanPayment[];
 	createdAt: string;
+	payments: { id: string; date: IsoDate; amount: Cents; note: string }[];
+}
+export function migrateLegacyLoans(records: LegacyLoan[]): Debtor[] {
+	const result: Debtor[] = [];
+	for (const loan of records) {
+		const key = loan.borrower.name.trim().replace(/\s+/g, ' ').toLocaleLowerCase('es-PE');
+		let debtor = result.find(
+			(d) => d.name.toLocaleLowerCase('es-PE') === key && d.currency === loan.currency
+		);
+		if (!debtor) {
+			debtor = {
+				id: result.some((d) => d.id === loan.id)
+					? `${loan.id}-${loan.currency.toLowerCase()}`
+					: loan.id,
+				currency: loan.currency,
+				name: loan.borrower.name.trim().replace(/\s+/g, ' '),
+				movements: [],
+				reference: null,
+				publicToken: loan.publicToken,
+				createdAt: loan.createdAt
+			};
+			result.push(debtor);
+		}
+		debtor.movements.push({
+			id: `advance-${loan.id}`,
+			kind: 'loan',
+			currency: loan.currency,
+			amount: loan.principal,
+			date: loan.lentOn,
+			note: loan.note
+		});
+		debtor.movements.push(
+			...loan.payments.map((p) => ({
+				...p,
+				id: `${loan.id}-${p.id}`,
+				kind: 'payment' as const,
+				currency: loan.currency
+			}))
+		);
+	}
+	return result;
 }
 
-export type LoanDraft = Omit<Loan, 'id' | 'payments' | 'publicToken' | 'createdAt'>;
-
-export type InstallmentStatus = 'paid' | 'partial' | 'overdue' | 'due-soon' | 'upcoming';
-
-export interface Installment {
-	index: number;
-	month: MonthKey;
-	dueDate: IsoDate;
-	amount: Cents;
-	covered: Cents;
-	status: InstallmentStatus;
-}
-
-export type LoanStatus = 'not-started' | 'on-track' | 'overdue' | 'completed';
-
-export interface LoanSummary {
-	schedule: Installment[];
-	paid: Cents;
-	balance: Cents;
-	overdueAmount: Cents;
-	overdueCount: number;
-	nextInstallment: Installment | null;
-	lastPayment: LoanPayment | null;
-	progressPercent: number;
-	status: LoanStatus;
-	endMonth: MonthKey;
-}
-
-export function installmentCount(principal: Cents, installment: Cents): number {
-	if (installment <= 0) return 0;
-	return Math.ceil(principal / installment);
-}
-
-export function sortedPayments(loan: Pick<Loan, 'payments'>): LoanPayment[] {
-	return [...loan.payments].sort((a, b) => b.date.localeCompare(a.date));
-}
-
-export function buildSchedule(loan: Loan, today: IsoDate = todayIso()): Installment[] {
-	const count = installmentCount(loan.principal, loan.installment);
-	let available = sum(loan.payments.map((p) => p.amount));
-
-	return Array.from({ length: count }, (_, index) => {
-		const isLast = index === count - 1;
-		const amount = isLast ? loan.principal - loan.installment * (count - 1) : loan.installment;
-		const month = addMonths(loan.firstDueMonth, index);
-		const dueDate = dateInMonth(month, loan.dueDay);
-		const covered = Math.min(available, amount);
-		available -= covered;
-
-		let status: InstallmentStatus;
-		if (covered === amount) status = 'paid';
-		else if (dueDate < today) status = 'overdue';
-		else if (daysBetween(today, dueDate) <= DUE_SOON_DAYS) status = 'due-soon';
-		else if (covered > 0) status = 'partial';
-		else status = 'upcoming';
-
-		return { index: index + 1, month, dueDate, amount, covered, status };
+export type PreviousDebtor = Omit<Debtor, 'currency'>;
+export function migrateDebtorCurrencies(records: PreviousDebtor[]): Debtor[] {
+	return records.flatMap((debtor) => {
+		const currencies = LOAN_CURRENCIES.filter(
+			(currency) =>
+				debtor.movements.some((m) => m.currency === currency) ||
+				debtor.reference?.currency === currency
+		);
+		if (!currencies.length) currencies.push('PEN');
+		return currencies.map((currency, index) => ({
+			...debtor,
+			id: index === 0 ? debtor.id : `${debtor.id}-${currency.toLowerCase()}`,
+			publicToken:
+				index === 0 ? debtor.publicToken : `${debtor.publicToken}-${currency.toLowerCase()}`,
+			currency,
+			movements: debtor.movements.filter((m) => m.currency === currency),
+			reference: debtor.reference?.currency === currency ? debtor.reference : null
+		}));
 	});
 }
 
-export function summarizeLoan(loan: Loan, today: IsoDate = todayIso()): LoanSummary {
-	const schedule = buildSchedule(loan, today);
-	const paid = Math.min(sum(loan.payments.map((p) => p.amount)), loan.principal);
-	const balance = loan.principal - paid;
-	const overdue = schedule.filter((i) => i.status === 'overdue');
-	const overdueAmount = sum(overdue.map((i) => i.amount - i.covered));
-	const nextInstallment = schedule.find((i) => i.status !== 'paid') ?? null;
-
-	let status: LoanStatus;
-	if (balance === 0) status = 'completed';
-	else if (overdue.length > 0) status = 'overdue';
-	else if (today < dateInMonth(loan.firstDueMonth, loan.dueDay) && paid === 0)
-		status = 'not-started';
-	else status = 'on-track';
-
-	return {
-		schedule,
-		paid,
-		balance,
-		overdueAmount,
-		overdueCount: overdue.length,
-		nextInstallment,
-		lastPayment: sortedPayments(loan)[0] ?? null,
-		progressPercent: percentOf(paid, loan.principal),
-		status,
-		endMonth: schedule.at(-1)?.month ?? loan.firstDueMonth
+export function isLoanMonth(month: string): boolean {
+	return /^\d{4}-(0[1-9]|1[0-2])$/.test(month) && month >= '2000-01' && month <= '2100-12';
+}
+export function validatePlan(principal: Cents, plan: PlannedAmount[]): string | null {
+	const seen = new Set<MonthKey>();
+	let total = 0;
+	for (const item of plan) {
+		if (!isLoanMonth(item.month)) return 'Elige un mes y año válidos.';
+		if (seen.has(item.month)) return 'Cada mes puede aparecer una sola vez en este préstamo.';
+		if (!Number.isSafeInteger(item.amount) || item.amount <= 0)
+			return 'Cada monto mensual debe ser mayor que cero.';
+		seen.add(item.month);
+		total += item.amount;
+	}
+	if (!Number.isSafeInteger(total) || total > principal)
+		return 'El reparto no puede superar el total de este préstamo.';
+	return null;
+}
+export interface MonthlyLoanSummary {
+	month: MonthKey;
+	expected: Cents;
+	paid: Cents;
+	remaining: Cents;
+	surplus: Cents;
+}
+export function monthlyLoanSummary(debtor: Debtor): MonthlyLoanSummary[] {
+	const months = new Map<MonthKey, { expected: Cents; paid: Cents }>();
+	const get = (month: MonthKey) => {
+		let item = months.get(month);
+		if (!item) {
+			item = { expected: 0, paid: 0 };
+			months.set(month, item);
+		}
+		return item;
 	};
+	for (const movement of debtor.movements) {
+		if (movement.kind === 'loan') {
+			for (const item of movement.plan ?? []) get(item.month).expected += item.amount;
+		} else if (movement.appliedMonth) get(movement.appliedMonth).paid += movement.amount;
+	}
+	return [...months]
+		.sort(([a], [b]) => a.localeCompare(b))
+		.map(([month, item]) => ({
+			month,
+			...item,
+			remaining: Math.max(0, item.expected - item.paid),
+			surplus: Math.max(0, item.paid - item.expected)
+		}));
 }
-
-export function validateLoan(draft: LoanDraft): string | null {
-	if (!draft.borrower.name.trim()) return 'Escribe el nombre de la persona.';
-	if (draft.borrower.name.length > 60) return 'El nombre puede tener hasta 60 caracteres.';
-	if (draft.principal <= 0) return 'Escribe un monto mayor que cero.';
-	if (!draft.lentOn) return 'Elige la fecha del préstamo.';
-	if (draft.installment <= 0) return 'Escribe una cuota mayor que cero.';
-	if (draft.installment > draft.principal) return 'La cuota no puede ser mayor que lo prestado.';
-	if (!draft.firstDueMonth) return 'Elige el mes de la primera cuota.';
-	if (draft.firstDueMonth < draft.lentOn.slice(0, 7))
-		return 'La primera cuota no puede ser antes del préstamo.';
-	if (draft.dueDay < 1 || draft.dueDay > 31) return 'Elige un día de pago entre 1 y 31.';
-	if (draft.note.length > 500) return 'El texto puede tener hasta 500 caracteres.';
-	return null;
+export function unplannedAmount(debtor: Debtor): Cents {
+	return debtor.movements
+		.filter((m) => m.kind === 'loan')
+		.reduce(
+			(total, m) => total + m.amount - (m.plan ?? []).reduce((sum, p) => sum + p.amount, 0),
+			0
+		);
 }
-
-export function validatePayment(
-	payment: Omit<LoanPayment, 'id'>,
-	balance: Cents,
-	today: IsoDate = todayIso()
-): string | null {
-	if (payment.amount <= 0) return 'Escribe un monto mayor que cero.';
-	if (payment.amount > balance) return 'El pago no puede ser mayor que lo que falta pagar.';
-	if (!payment.date) return 'Elige la fecha del pago.';
-	if (payment.date > today) return 'La fecha no puede ser posterior a hoy.';
-	if (payment.note.length > 500) return 'El texto puede tener hasta 500 caracteres.';
-	return null;
+export function unassignedPayments(debtor: Debtor): Cents {
+	return debtor.movements
+		.filter((m) => m.kind === 'payment' && !m.appliedMonth)
+		.reduce((total, m) => total + m.amount, 0);
 }

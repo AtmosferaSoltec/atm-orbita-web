@@ -1,4 +1,5 @@
 <script lang="ts">
+	import LoansStatus from '#lib/components/loans/LoansStatus.svelte';
 	import ServicesStatus from '#lib/components/services/ServicesStatus.svelte';
 	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
@@ -6,7 +7,6 @@
 		ArrowDownLeft,
 		CalendarClock,
 		ChevronRight,
-		CircleAlert,
 		Clock,
 		HandCoins,
 		PartyPopper,
@@ -21,12 +21,14 @@
 	import {
 		daysBetween,
 		formatDate,
+		formatMonth,
+		toMonthKey,
 		formatShortDate,
 		relativeDays,
 		todayIso
 	} from '#lib/domain/dates.ts';
 	import { summarizeYear } from '#lib/domain/receipts.ts';
-	import { DUE_SOON_DAYS, summarizeLoan } from '#lib/domain/loans.ts';
+	import { balancesOf, hasDebt, monthlyLoanSummary } from '#lib/domain/loans.ts';
 	import { membersStatus, monthlyTotals, owedToMe, upcomingCharges } from '#lib/domain/services.ts';
 	import { loans } from '#lib/stores/loans.svelte.ts';
 	import { receipts } from '#lib/stores/receipts.svelte.ts';
@@ -59,13 +61,14 @@
 
 	const today = todayIso();
 	const serviceToday = $derived(services.today);
-	// Receipts and services come from the API; loans are still demo data.
+	// Each module loads independently; a failed module does not clear the others.
 	const year = $derived(receipts.currentYear);
 	const receiptItems = $derived(receipts.itemsOf(year) ?? []);
 	const receiptsLoaded = $derived(receipts.itemsOf(year) !== undefined);
 
 	onMount(() => {
 		void services.load();
+		void loans.load();
 	});
 
 	onMount(async () => {
@@ -78,9 +81,6 @@
 	});
 
 	const receiptSummary = $derived(summarizeYear(receiptItems, year, receipts.limitFor(year)));
-	const loanSummaries = $derived(
-		loans.items.map((loan) => ({ loan, summary: summarizeLoan(loan, today) }))
-	);
 	const serviceTotals = $derived(monthlyTotals(services.items));
 
 	function byCurrency(values: { currency: Currency; amount: Cents }[]): string {
@@ -94,15 +94,10 @@
 
 	const loanBalance = $derived(
 		byCurrency(
-			loanSummaries.map(({ loan, summary }) => ({
-				currency: loan.currency,
-				amount: summary.balance
-			}))
+			loans.items.flatMap(balancesOf).map((b) => ({ currency: b.currency, amount: b.balance }))
 		)
 	);
-	const activeLoans = $derived(
-		loanSummaries.filter(({ summary }) => summary.status !== 'completed').length
-	);
+	const activeLoans = $derived(loans.items.filter(hasDebt).length);
 	const owed = $derived(
 		byCurrency(
 			services.items.map((s) => ({ currency: s.currency, amount: owedToMe(s, serviceToday) }))
@@ -111,29 +106,20 @@
 
 	const alerts = $derived.by(() => {
 		const list: Alert[] = [];
-		for (const { loan, summary } of loanSummaries) {
-			const href = resolve('/(app)/loans/[id]', { id: loan.id });
-			if (summary.status === 'overdue') {
+		for (const debtor of loans.items) {
+			for (const month of monthlyLoanSummary(debtor)) {
+				if (month.month > toMonthKey(today) || month.remaining <= 0) continue;
 				list.push({
-					key: `loan-overdue-${loan.id}`,
-					icon: CircleAlert,
-					tone: 'expense',
-					title: `${loan.borrower.name} tiene cuotas atrasadas`,
-					detail: `${summary.overdueCount} ${summary.overdueCount === 1 ? 'cuota vencida' : 'cuotas vencidas'}`,
-					amount: formatMoney(summary.overdueAmount, loan.currency),
-					href,
-					priority: 0
-				});
-			} else if (summary.nextInstallment?.status === 'due-soon') {
-				const next = summary.nextInstallment;
-				list.push({
-					key: `loan-soon-${loan.id}`,
+					key: `loan-month-${debtor.id}-${month.month}`,
 					icon: HandCoins,
 					tone: 'orange',
-					title: `Cuota de ${loan.borrower.name}`,
-					detail: `Vence ${relativeDays(next.dueDate, today)} · ${formatShortDate(next.dueDate)}`,
-					amount: formatMoney(next.amount - next.covered, loan.currency),
-					href,
+					title: `${debtor.name} · ${formatMonth(month.month)}`,
+					detail:
+						month.month < toMonthKey(today)
+							? 'Pendiente de un mes anterior'
+							: 'Pendiente para este mes',
+					amount: formatMoney(month.remaining, debtor.currency),
+					href: resolve('/(app)/loans/[id]', { id: debtor.id }),
 					priority: 2
 				});
 			}
@@ -214,15 +200,15 @@
 			});
 		}
 		for (const loan of loans.items) {
-			for (const p of loan.payments) {
+			for (const p of loan.movements.filter((m) => m.kind === 'payment')) {
 				list.push({
 					key: `lp-${p.id}`,
 					date: p.date,
 					icon: ArrowDownLeft,
 					tone: 'income',
-					title: `${loan.borrower.name} pagó`,
+					title: `${loan.name} pagó`,
 					detail: `Préstamo · ${formatShortDate(p.date)}`,
-					amount: formatMoney(p.amount, loan.currency, { signed: true }),
+					amount: formatMoney(p.amount, p.currency, { signed: true }),
 					href: resolve('/(app)/loans/[id]', { id: loan.id })
 				});
 			}
@@ -268,6 +254,7 @@
 </header>
 
 <ServicesStatus />
+<LoansStatus />
 <div class="grid gap-5 lg:grid-cols-[1.25fr_1fr]">
 	<a
 		href={resolve('/(app)/receipts')}
@@ -289,8 +276,10 @@
 			icon={HandCoins}
 			tone="income"
 			label="Préstamos por cobrar"
-			value={loanBalance}
-			hint="{activeLoans} {activeLoans === 1 ? 'préstamo en curso' : 'préstamos en curso'}"
+			value={loans.loaded ? loanBalance : '—'}
+			hint="{activeLoans} {activeLoans === 1
+				? 'persona con saldo pendiente'
+				: 'personas con saldo pendiente'}"
 			href={resolve('/(app)/loans')}
 		/>
 		<StatCard
@@ -319,7 +308,7 @@
 	<section>
 		<h2 class="text-base font-extrabold">Pendientes</h2>
 		<p class="mt-0.5 text-[13px] text-muted">
-			Atrasos, deudas y cobros de los próximos {DUE_SOON_DAYS} días.
+			Meses pendientes de préstamos y próximos cobros de servicios.
 		</p>
 		<Card padding="none" class="mt-3 overflow-hidden">
 			{#if alerts.length}

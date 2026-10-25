@@ -33,5 +33,14 @@
 	class={className}
 	prefix={CURRENCY_SYMBOL[currency]}
 	inputmode="decimal"
+	pattern="[0-9.,]*"
+	onbeforeinput={(event) => {
+		if (event.data && /[^0-9.,]/.test(event.data)) event.preventDefault();
+	}}
+	oninput={(event) => {
+		// Reject invalid typing, paste and drop as a whole; never reinterpret an amount.
+		const input = event.currentTarget;
+		if (/[^0-9.,]/.test(input.value)) input.value = value;
+	}}
 	autocomplete="off"
 />
