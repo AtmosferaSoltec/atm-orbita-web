@@ -67,14 +67,43 @@ class SessionStore {
 		}
 	}
 
+	/**
+	 * Deletes the account for good. Without a session it signs in first (the public
+	 * deletion page); if the deletion fails that session is closed again, so a
+	 * visitor is never left signed in by a failed attempt.
+	 */
+	async deleteAccount(email: string, password: string): Promise<void> {
+		const openedHere = !this.user;
+		if (openedHere) this.user = await auth.login(email, password);
+		try {
+			await auth.deleteAccount(password);
+		} catch (failure) {
+			if (openedHere) await this.signOut().catch(() => undefined);
+			throw failure;
+		}
+		this.#forget();
+	}
+
+	/** Deletes the account of a Google user; no session needed. */
+	async deleteAccountWithGoogle(credential: string): Promise<void> {
+		await auth.deleteAccountWithGoogle(credential);
+		this.#forget();
+	}
+
 	/** The API rejected the session (revoked elsewhere, expired): back to login. */
 	expire(): void {
 		if (!this.user) return;
+		this.#forget();
+		void goto(resolve('/(auth)/login'), { replaceState: true });
+	}
+
+	/** Drops everything of the person from memory (the next one must not see it). */
+	#forget(): void {
+		setAccessToken(null);
 		this.user = null;
 		receipts.clear();
 		services.clear();
 		loans.clear();
-		void goto(resolve('/(auth)/login'), { replaceState: true });
 	}
 }
 

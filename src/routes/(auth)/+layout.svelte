@@ -35,6 +35,10 @@
 				<div class="h-6"></div>
 			</div>
 			{@render children()}
+			<p class="mt-8 flex justify-center gap-4 text-xs text-muted">
+				<a href={resolve('/privacy')} class="hover:underline">Política de privacidad</a>
+				<a href={resolve('/delete-account')} class="hover:underline">Eliminar mi cuenta</a>
+			</p>
 		</div>
 	</main>
 </div>

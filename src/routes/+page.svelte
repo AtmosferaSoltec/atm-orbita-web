@@ -266,7 +266,15 @@
 			class="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-4 text-sm text-muted sm:px-6"
 		>
 			<Logo size="sm" />
-			<p>© 2026 Atmosfera · Orbita</p>
+			<nav class="flex flex-wrap items-center gap-x-5 gap-y-2" aria-label="Información legal">
+				<a href={resolve('/privacy')} class="font-semibold hover:text-ink hover:underline"
+					>Política de privacidad</a
+				>
+				<a href={resolve('/delete-account')} class="font-semibold hover:text-ink hover:underline"
+					>Eliminar mi cuenta</a
+				>
+				<span>© 2026 Atmosfera · Orbita</span>
+			</nav>
 		</div>
 	</footer>
 </div>

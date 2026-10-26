@@ -101,12 +101,26 @@ async function toError(res: Response): Promise<ApiError> {
 	}
 }
 
-/** Sends a request; on 401 renews the session once and retries. */
+/** The API's error code of a failed response, without consuming its body. */
+async function errorCodeOf(res: Response): Promise<string | undefined> {
+	try {
+		return ((await res.clone().json()) as { error?: { code?: string } }).error?.code;
+	} catch {
+		return undefined;
+	}
+}
+
+/**
+ * Sends a request; when the access token is rejected (UNAUTHORIZED) renews the
+ * session once and retries. Other 401s (a wrong password when deleting the
+ * account) are answers, not an expired session: retrying them would count twice
+ * against the API's limit of failed attempts.
+ */
 async function request(path: string, options: RequestOptions = {}): Promise<Response> {
 	let res = await (path.startsWith('/auth/') && options.method === 'POST'
 		? withSessionLock(() => send(path, options))
 		: send(path, options));
-	if (res.status === 401 && options.auth !== false) {
+	if (res.status === 401 && options.auth !== false && (await errorCodeOf(res)) === 'UNAUTHORIZED') {
 		if (await refreshSession()) {
 			res = await send(path, options);
 		} else {

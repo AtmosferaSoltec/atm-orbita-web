@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import { LogOut } from '@lucide/svelte';
+	import { LogOut, ShieldCheck, Trash2 } from '@lucide/svelte';
 	import Avatar from '../ui/Avatar.svelte';
 	import { session } from '#lib/stores/session.svelte.ts';
 
@@ -50,6 +50,22 @@
 				? 'top-full right-0 mt-2'
 				: 'bottom-full left-0 mb-2'}"
 		>
+			<a
+				role="menuitem"
+				href={resolve('/privacy')}
+				class="flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-semibold hover:bg-neutral-soft"
+				onclick={() => (open = false)}
+			>
+				<ShieldCheck size={17} class="text-muted" /> Política de privacidad
+			</a>
+			<a
+				role="menuitem"
+				href={resolve('/delete-account')}
+				class="flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-semibold hover:bg-neutral-soft"
+				onclick={() => (open = false)}
+			>
+				<Trash2 size={17} class="text-muted" /> Eliminar cuenta
+			</a>
 			<button
 				role="menuitem"
 				type="button"

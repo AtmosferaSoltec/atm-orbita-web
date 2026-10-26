@@ -27,6 +27,8 @@ const MESSAGES: Record<string, string> = {
 
 	SERVICE_CURRENCY_LOCKED: 'La moneda no se puede cambiar mientras existan pagos registrados.',
 	GOOGLE_UNAVAILABLE: 'El acceso con Google no está disponible en este momento.',
+	GOOGLE_ACCOUNT_NOT_LINKED:
+		'Ese Google no tiene una cuenta de Orbita. Si te registraste con correo y contraseña, usa esa opción.',
 	GOOGLE_INVALID: 'No pudimos verificar tu cuenta de Google. Vuelve a continuar con Google.',
 	GOOGLE_CHALLENGE_EXPIRED: 'El intento de acceso venció. Vuelve a continuar con Google.',
 	GOOGLE_LINK_REQUIRED: 'Confirma tu contraseña de Orbita para vincular Google.',

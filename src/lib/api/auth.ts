@@ -92,3 +92,17 @@ export function resetPassword(email: string, code: string, newPassword: string):
 		auth: false
 	});
 }
+
+/** Deletes the account and all its data for good; the API asks for the password again. */
+export function deleteAccount(password: string): Promise<void> {
+	return api('/me', { method: 'DELETE', body: { password } });
+}
+
+/**
+ * Deletes the account of whoever signed in with Google (no password to ask for).
+ * It needs no session: the fresh Google credential proves who the person is, so it
+ * also works for someone who uninstalled the app.
+ */
+export function deleteAccountWithGoogle(credential: string): Promise<void> {
+	return api('/auth/google/delete-account', { method: 'POST', body: { credential }, auth: false });
+}

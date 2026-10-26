@@ -8,6 +8,11 @@ Orbita's web app (SvelteKit). Built from the same product as the Android app (`a
 
 Plus: landing (`/`), login, register, forgot password (3 steps, like Android) and dashboard (`/dashboard`).
 
+Public pages Google Play asks for (no session needed, linked from the landing, the sign-in screens and the user menu):
+
+- `/privacy`: the privacy policy. It states what the system really stores and which providers it uses (Cloudflare, Resend, Google), the 14-day retention of server logs and that there are no backups: **update it in the same change** that adds data, a provider, analytics or backups.
+- `/delete-account`: real, irreversible deletion of the account and its data. Email + password (signs in first if there is no session, and closes that session if it fails) or Google (`POST /auth/google/delete-account`, API plan 21: the fresh Google credential proves who the person is, so no session is needed). Contact for people who cannot sign in: `atmosfera.soltec@gmail.com`.
+
 ## Status (24 Oct 2026)
 
 | Part                              | State                                                                                                     |
