@@ -14,7 +14,7 @@
 <section
 	class="relative isolate overflow-hidden rounded-hero p-6 text-white shadow-xl sm:p-7 {variant ===
 	'savings'
-		? 'hero-savings shadow-violet/25'
+		? 'hero-savings shadow-primary/25'
 		: 'hero-credit shadow-orange/25'} {className}"
 >
 	<div class="hero-veil pointer-events-none absolute inset-0 -z-10"></div>

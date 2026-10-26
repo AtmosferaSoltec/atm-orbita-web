@@ -63,12 +63,12 @@
 }
 
 @layer components {
-	/* Highlighted card: violet → blue → teal, cyan glow top right, dark veil to the bottom. */
+	/* Highlighted card: the logo's blue → celeste → cyan, light glow top right, dark veil to the bottom. */
 	.hero-savings {
 		background:
 			radial-gradient(120% 90% at 100% 0%, rgb(103 232 249 / 0.3), transparent 55%),
-			radial-gradient(90% 80% at 0% 100%, rgb(59 29 143 / 0.45), transparent 60%),
-			linear-gradient(135deg, #3b1d8f 0%, #1d4ed8 52%, #0e7490 100%);
+			radial-gradient(90% 80% at 0% 100%, rgb(26 26 26 / 0.45), transparent 60%),
+			linear-gradient(135deg, #1d4ed8 0%, #2563eb 35%, #0ea5e9 80%, #0e90b8 100%);
 	}
 
 	.hero-credit {

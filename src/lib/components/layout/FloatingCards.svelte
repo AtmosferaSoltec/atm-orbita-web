@@ -40,7 +40,7 @@
 		<div
 			class="float flex h-full w-full flex-col justify-between rounded-hero p-5 {variant ===
 			'savings'
-				? 'hero-savings text-white shadow-2xl shadow-violet/40'
+				? 'hero-savings text-white shadow-2xl shadow-primary/40'
 				: 'hero-credit text-ink shadow-2xl shadow-orange/40'}"
 		>
 			<div class="flex items-start justify-between">

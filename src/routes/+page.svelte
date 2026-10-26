@@ -114,7 +114,7 @@
 			<h1 class="mt-5 text-4xl leading-[1.1] font-extrabold tracking-tight sm:text-5xl">
 				Que no se te escape ni un sol de lo que
 				<span
-					class="bg-gradient-to-r from-[#3B1D8F] via-primary to-[#0E7490] bg-clip-text text-transparent"
+					class="bg-gradient-to-r from-[#2563EB] via-[#0EA5E9] to-[#0E90B8] bg-clip-text text-transparent"
 				>
 					emites, prestas o compartes.
 				</span>
@@ -142,7 +142,7 @@
 		<!-- Product preview built from the same pieces as the dashboard -->
 		<div class="relative mx-auto w-full max-w-md" aria-hidden="true">
 			<div
-				class="hero-savings relative overflow-hidden rounded-hero p-6 text-white shadow-2xl shadow-violet/30"
+				class="hero-savings relative overflow-hidden rounded-hero p-6 text-white shadow-2xl shadow-primary/30"
 			>
 				<div class="hero-veil absolute inset-0"></div>
 				<div class="relative">
