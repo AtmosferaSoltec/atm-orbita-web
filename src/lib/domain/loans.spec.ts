@@ -180,8 +180,22 @@ describe('manually planned months', () => {
 			{ month: '2026-11', amount: 50000 }
 		];
 		expect(monthlyLoanSummary(person)).toEqual([
-			{ month: '2026-10', expected: 80000, paid: 50000, remaining: 30000, surplus: 0, status: 'partial' },
-			{ month: '2026-11', expected: 50000, paid: 0, remaining: 50000, surplus: 0, status: 'pending' }
+			{
+				month: '2026-10',
+				expected: 80000,
+				paid: 50000,
+				remaining: 30000,
+				surplus: 0,
+				status: 'partial'
+			},
+			{
+				month: '2026-11',
+				expected: 50000,
+				paid: 0,
+				remaining: 50000,
+				surplus: 0,
+				status: 'pending'
+			}
 		]);
 		expect(totalPlanned(person)).toBe(130000);
 		expect(balancesOf(person)[0].balance).toBe(550000);
@@ -196,8 +210,22 @@ describe('manually planned months', () => {
 			{ month: '2026-11', amount: 120000 }
 		];
 		expect(monthlyLoanSummary(person)).toEqual([
-			{ month: '2026-10', expected: 80000, paid: 100000, remaining: 0, surplus: 20000, status: 'completed' },
-			{ month: '2026-11', expected: 120000, paid: 0, remaining: 120000, surplus: 0, status: 'pending' }
+			{
+				month: '2026-10',
+				expected: 80000,
+				paid: 100000,
+				remaining: 0,
+				surplus: 20000,
+				status: 'completed'
+			},
+			{
+				month: '2026-11',
+				expected: 120000,
+				paid: 0,
+				remaining: 120000,
+				surplus: 0,
+				status: 'pending'
+			}
 		]);
 		expect(balancesOf(person)[0].balance).toBe(100000);
 	});

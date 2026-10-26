@@ -100,8 +100,24 @@ export function seedLoans(): Debtor[] {
 			name: 'Rosa Huamán',
 			currency: 'PEN',
 			movements: [
-				{ id: 'r-a', kind: 'loan', currency: 'PEN', amount: 80000, date: '2026-01-08', title: 'Préstamo', note: '' },
-				{ id: 'r-p', kind: 'payment', currency: 'PEN', amount: 80000, date: '2026-05-08', note: '', appliedMonth: '2026-05' }
+				{
+					id: 'r-a',
+					kind: 'loan',
+					currency: 'PEN',
+					amount: 80000,
+					date: '2026-01-08',
+					title: 'Préstamo',
+					note: ''
+				},
+				{
+					id: 'r-p',
+					kind: 'payment',
+					currency: 'PEN',
+					amount: 80000,
+					date: '2026-05-08',
+					note: '',
+					appliedMonth: '2026-05'
+				}
 			],
 			plans: [],
 			reference: null,

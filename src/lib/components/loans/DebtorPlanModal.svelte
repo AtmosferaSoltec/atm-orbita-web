@@ -133,7 +133,7 @@
 
 		<Button variant="secondary" size="sm" icon={Plus} onclick={add}>Añadir otro mes</Button>
 
-		<div class="rounded-2xl bg-primary-soft p-4 text-xs space-y-1.5">
+		<div class="space-y-1.5 rounded-2xl bg-primary-soft p-4 text-xs">
 			<div class="flex justify-between gap-2">
 				<span class="text-muted">Total prestado</span>
 				<strong class="tabular">{formatMoney(totalLent, debtor.currency)}</strong>
@@ -147,8 +147,7 @@
 			{#if unallocatedDebt > 0}
 				<div class="flex justify-between gap-2">
 					<span class="text-muted">Sin programar aún</span>
-					<strong class="tabular text-muted"
-						>{formatMoney(unallocatedDebt, debtor.currency)}</strong
+					<strong class="tabular text-muted">{formatMoney(unallocatedDebt, debtor.currency)}</strong
 					>
 				</div>
 			{/if}
@@ -162,4 +161,3 @@
 		</div>
 	</form>
 </Modal>
-

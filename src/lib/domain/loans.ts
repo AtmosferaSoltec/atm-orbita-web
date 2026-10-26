@@ -234,7 +234,7 @@ export function monthlyLoanSummary(debtor: Debtor): MonthlyLoanSummary[] {
 		.map(([month, item]) => {
 			const remaining = Math.max(0, item.expected - item.paid);
 			const surplus = Math.max(0, item.paid - item.expected);
-			let status: MonthlyLoanSummary['status'] = 'pending';
+			let status: MonthlyLoanSummary['status'];
 			if (item.expected > 0) {
 				if (item.paid >= item.expected) status = 'completed';
 				else if (item.paid > 0) status = 'partial';

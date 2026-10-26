@@ -1,12 +1,5 @@
 <script lang="ts">
-	import {
-		CalendarRange,
-		CheckCircle2,
-		Clock,
-		Pencil,
-		Plus,
-		Trash2
-	} from '@lucide/svelte';
+	import { CalendarRange, CheckCircle2, Clock, Pencil, Plus, Trash2 } from '@lucide/svelte';
 	import {
 		Badge,
 		Button,
@@ -19,8 +12,7 @@
 		monthlyLoanSummary,
 		totalPlanned,
 		unassignedPayments,
-		type Debtor,
-		type MonthlyLoanSummary
+		type Debtor
 	} from '#lib/domain/loans.ts';
 	import { formatMoney, percentOf } from '#lib/domain/money.ts';
 	import { formatMonth, todayIso, toMonthKey } from '#lib/domain/dates.ts';
@@ -61,12 +53,7 @@
 		</div>
 		{#if !readonly}
 			<div class="flex items-center gap-2">
-				<Button
-					variant="secondary"
-					size="sm"
-					icon={Plus}
-					onclick={() => oneditplan?.()}
-				>
+				<Button variant="secondary" size="sm" icon={Plus} onclick={() => oneditplan?.()}>
 					{debtor.plans?.length ? 'Gestionar cuotas' : 'Definir cuotas por mes'}
 				</Button>
 			</div>
@@ -84,9 +71,13 @@
 				</div>
 				<div class="rounded-2xl border border-outline bg-surface p-3 sm:p-4">
 					<p class="text-[11px] font-semibold text-muted">Abonado acumulado</p>
-					<p class="tabular mt-1 text-sm font-extrabold text-income-strong sm:text-lg">{money(totalPaid)}</p>
+					<p class="tabular mt-1 text-sm font-extrabold text-income-strong sm:text-lg">
+						{money(totalPaid)}
+					</p>
 				</div>
-				<div class="col-span-2 rounded-2xl border border-outline bg-surface p-3 sm:col-span-1 sm:p-4">
+				<div
+					class="col-span-2 rounded-2xl border border-outline bg-surface p-3 sm:col-span-1 sm:p-4"
+				>
 					<p class="text-[11px] font-semibold text-muted">Progreso del plan</p>
 					<p class="tabular mt-1 text-sm font-extrabold text-primary sm:text-lg">
 						{percentOf(totalPaid, plannedTotal)}% cubierto
@@ -99,8 +90,12 @@
 		<div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
 			{#each summary as item (item.month)}
 				{@const isCurrent = item.month === currentMonth}
-				{@const progress = item.expected > 0 ? Math.min(100, Math.round((item.paid / item.expected) * 100)) : 100}
-				<Card padding="none" class="flex flex-col justify-between overflow-hidden border border-outline transition-shadow hover:shadow-sm">
+				{@const progress =
+					item.expected > 0 ? Math.min(100, Math.round((item.paid / item.expected) * 100)) : 100}
+				<Card
+					padding="none"
+					class="flex flex-col justify-between overflow-hidden border border-outline transition-shadow hover:shadow-sm"
+				>
 					<div class="border-b border-divider bg-canvas/40 px-4 py-3">
 						<div class="flex items-center justify-between gap-2">
 							<div class="flex items-center gap-2">
@@ -108,7 +103,9 @@
 									{formatMonth(item.month)}
 								</h3>
 								{#if isCurrent}
-									<span class="rounded-md bg-primary-soft px-1.5 py-0.5 text-[10px] font-bold text-primary">
+									<span
+										class="rounded-md bg-primary-soft px-1.5 py-0.5 text-[10px] font-bold text-primary"
+									>
 										Este mes
 									</span>
 								{/if}
@@ -123,13 +120,9 @@
 									Falta {money(item.remaining)}
 								</Badge>
 							{:else if item.status === 'pending'}
-								<Badge tone="neutral">
-									Pendiente
-								</Badge>
+								<Badge tone="neutral">Pendiente</Badge>
 							{:else}
-								<Badge tone="primary">
-									Abono extra
-								</Badge>
+								<Badge tone="primary">Abono extra</Badge>
 							{/if}
 						</div>
 					</div>
@@ -138,7 +131,7 @@
 						<div class="grid grid-cols-2 gap-2 text-xs">
 							<div>
 								<span class="block text-muted">Acordado</span>
-								<span class="tabular font-extrabold text-foreground">
+								<span class="tabular text-foreground font-extrabold">
 									{item.expected > 0 ? money(item.expected) : '—'}
 								</span>
 							</div>
@@ -159,13 +152,16 @@
 								<ProgressBar
 									value={progress}
 									tone={item.status === 'completed' ? 'income' : 'primary'}
+									label="Cumplimiento de {formatMonth(item.month)}"
 								/>
 							</div>
 						{/if}
 					</div>
 
 					{#if !readonly}
-						<div class="flex items-center justify-between border-t border-divider bg-canvas/20 px-3 py-2 text-xs">
+						<div
+							class="flex items-center justify-between border-t border-divider bg-canvas/20 px-3 py-2 text-xs"
+						>
 							<button
 								type="button"
 								class="inline-flex items-center gap-1 font-bold text-primary hover:underline"
@@ -198,9 +194,7 @@
 			>
 				{#snippet action()}
 					{#if !readonly}
-						<Button icon={Plus} onclick={() => oneditplan?.()}>
-							Definir cuotas por mes
-						</Button>
+						<Button icon={Plus} onclick={() => oneditplan?.()}>Definir cuotas por mes</Button>
 					{/if}
 				{/snippet}
 			</EmptyState>
@@ -209,7 +203,8 @@
 
 	{#if unassigned > 0}
 		<div class="mt-3 rounded-xl bg-orange-soft p-3 text-xs text-orange-strong">
-			Hay {money(unassigned)} en abonos antiguos sin mes especificado. Puedes editarlos para asignarlos al mes correspondiente.
+			Hay {money(unassigned)} en abonos antiguos sin mes especificado. Puedes editarlos para asignarlos
+			al mes correspondiente.
 		</div>
 	{/if}
 </section>
