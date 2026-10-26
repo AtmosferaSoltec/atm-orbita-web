@@ -1,267 +1,215 @@
 <script lang="ts">
-	import { ChevronLeft, ChevronRight, CalendarRange } from '@lucide/svelte';
-	import { Button, Card, IconButton, EmptyState, MonthField } from '#lib/components/ui/index.ts';
+	import {
+		CalendarRange,
+		CheckCircle2,
+		Clock,
+		Pencil,
+		Plus,
+		Trash2
+	} from '@lucide/svelte';
+	import {
+		Badge,
+		Button,
+		Card,
+		EmptyState,
+		IconButton,
+		ProgressBar
+	} from '#lib/components/ui/index.ts';
 	import {
 		monthlyLoanSummary,
+		totalPlanned,
 		unassignedPayments,
-		unplannedAmount,
 		type Debtor,
-		type LoanMovement
+		type MonthlyLoanSummary
 	} from '#lib/domain/loans.ts';
-	import { formatMoney } from '#lib/domain/money.ts';
-	import {
-		addMonths,
-		formatMonth,
-		formatMonthShort,
-		todayIso,
-		toMonthKey
-	} from '#lib/domain/dates.ts';
-	let { debtor, onplan }: { debtor: Debtor; onplan?: (movement: LoanMovement) => void } = $props();
+	import { formatMoney, percentOf } from '#lib/domain/money.ts';
+	import { formatMonth, todayIso, toMonthKey } from '#lib/domain/dates.ts';
+	import { loans } from '#lib/stores/loans.svelte.ts';
+	import { toasts } from '#lib/stores/toasts.svelte.ts';
+
+	let {
+		debtor,
+		oneditplan,
+		readonly = false
+	}: {
+		debtor: Debtor;
+		oneditplan?: (initialMonth?: string) => void;
+		readonly?: boolean;
+	} = $props();
+
 	const currentMonth = toMonthKey(todayIso());
-	let selectedMonth = $state(currentMonth);
-	let start = $state(addMonths(currentMonth, -2));
-	$effect(() => {
-		const from = addMonths(selectedMonth, -2);
-		start = from < '2000-01' ? '2000-01' : from > '2100-07' ? '2100-07' : from;
-	});
-	function move(step: number) {
-		const from = addMonths(start, step);
-		start = from < '2000-01' ? '2000-01' : from > '2100-07' ? '2100-07' : from;
-	}
-	const months = $derived(Array.from({ length: 6 }, (_, i) => addMonths(start, i)));
-	const entries = $derived(
-		debtor.movements
-			.filter((m) => m.kind === 'loan')
-			.toSorted((a, b) => a.date.localeCompare(b.date))
-	);
 	const summary = $derived(monthlyLoanSummary(debtor));
-	const current = $derived(summary.find((s) => s.month === selectedMonth));
-	const unplanned = $derived(unplannedAmount(debtor));
+	const plannedTotal = $derived(totalPlanned(debtor));
 	const unassigned = $derived(unassignedPayments(debtor));
 	const money = (value: number) => formatMoney(value, debtor.currency);
+
+	async function removeMonth(monthToRemove: string) {
+		const newPlans = (debtor.plans ?? []).filter((p) => p.month !== monthToRemove);
+		const error = await loans.setPlan(debtor.id, newPlans);
+		if (error) toasts.error(error);
+		else toasts.success('Cuota del mes eliminada.');
+	}
 </script>
 
-<section class="mt-6 min-w-0" aria-label="Plan mensual">
+<section class="mt-6 min-w-0" aria-label="Plan mensual de pagos">
 	<div class="mb-4 flex flex-wrap items-center justify-between gap-3">
 		<div>
 			<h2 class="text-lg font-extrabold">Plan mensual</h2>
-			<p class="mt-1 text-sm text-muted">
-				Lo acordado por compra o préstamo, sin días de vencimiento.
+			<p class="mt-0.5 text-xs text-muted">
+				Cuotas acordadas por mes y seguimiento de cumplimiento de abonos.
 			</p>
 		</div>
-		<div class="w-full sm:w-72">
-			<MonthField
-				label="Mes a consultar"
-				bind:value={selectedMonth}
-				fromYear={2000}
-				toYear={2100}
-			/>
-		</div>
-	</div>
-	<div class="mb-4 hidden gap-4 sm:grid sm:grid-cols-3">
-		{#each [{ label: 'Previsto del mes', amount: current?.expected ?? 0 }, { label: 'Pagado para el mes', amount: current?.paid ?? 0 }, { label: 'Faltante del mes', amount: current?.remaining ?? 0 }] as stat (stat.label)}<div
-				class="flex items-center justify-between gap-3 rounded-2xl border border-outline bg-surface p-3 sm:block sm:p-4"
-			>
-				<p class="text-[11px] font-semibold text-muted sm:text-xs">{stat.label}</p>
-				<p class="tabular text-sm font-extrabold sm:mt-2 sm:text-xl">{money(stat.amount)}</p>
-			</div>{/each}
-	</div>
-	<Card padding="none" class="min-w-0 overflow-hidden">
-		<div
-			class="hidden flex-wrap items-center justify-between gap-3 border-b border-divider p-4 sm:flex"
-		>
-			<p class="text-sm font-bold capitalize">
-				{formatMonthShort(start)} — {formatMonthShort(months[5])}
-			</p>
-			<div class="flex items-center gap-1">
-				<IconButton
-					icon={ChevronLeft}
-					label="Seis meses anteriores"
-					variant="ghost"
-					disabled={start <= '2000-01'}
-					onclick={() => move(-6)}
-				/><Button
-					variant="ghost"
+		{#if !readonly}
+			<div class="flex items-center gap-2">
+				<Button
+					variant="secondary"
 					size="sm"
-					onclick={() => {
-						selectedMonth = currentMonth;
-						start = addMonths(currentMonth, -2);
-					}}>Este mes</Button
-				><IconButton
-					icon={ChevronRight}
-					label="Seis meses siguientes"
-					variant="ghost"
-					disabled={months[5] >= '2100-12'}
-					onclick={() => move(6)}
-				/>
+					icon={Plus}
+					onclick={() => oneditplan?.()}
+				>
+					{debtor.plans?.length ? 'Gestionar cuotas' : 'Definir cuotas por mes'}
+				</Button>
 			</div>
-		</div>
-		{#if entries.length}
-			<div class="sm:hidden" role="region" aria-label="Detalle mensual">
-				<h3 class="border-b border-divider bg-canvas px-4 py-3 text-sm font-extrabold">
-					{formatMonth(selectedMonth)}
-				</h3>
-				<ul class="divide-y divide-divider">
-					{#each entries as entry, i (entry.id)}
-						{@const amount = entry.plan?.find((p) => p.month === selectedMonth)?.amount ?? 0}
-						<li class="px-4 py-4">
-							<div class="flex items-start justify-between gap-3">
-								<div class="min-w-0">
-									<p class="text-sm font-bold break-words">
-										{entry.title || entry.note || `Préstamo ${i + 1}`}
-									</p>
-									<p class="mt-1 text-xs text-muted">Total: {money(entry.amount)}</p>
-								</div>
-								<p class="tabular shrink-0 text-sm font-extrabold">
-									{amount ? money(amount) : '—'}
-								</p>
-							</div>
-							{#if onplan}<button
-									type="button"
-									class="mt-2 py-1 text-xs font-bold text-primary"
-									aria-label={`Repartir ${entry.title || entry.note || `préstamo ${i + 1}`} por meses`}
-									onclick={() => onplan?.(entry)}
-									>{entry.plan?.length ? 'Editar reparto' : 'Repartir por meses'}</button
-								>{/if}
-						</li>
-					{/each}
-				</ul>
-				<dl class="space-y-3 border-t border-divider bg-primary-soft p-4 text-sm">
-					<div class="flex justify-between gap-3">
-						<dt>Previsto</dt>
-						<dd class="tabular font-extrabold">{money(current?.expected ?? 0)}</dd>
-					</div>
-					<div class="flex justify-between gap-3 text-income-strong">
-						<dt>Pagado</dt>
-						<dd class="tabular font-extrabold">{money(current?.paid ?? 0)}</dd>
-					</div>
-					<div class="flex justify-between gap-3 text-primary">
-						<dt>Faltante</dt>
-						<dd class="tabular font-extrabold" data-mobile-total="remaining">
-							{money(current?.remaining ?? 0)}
-						</dd>
-					</div>
-					{#if current?.surplus}<div class="flex justify-between gap-3">
-							<dt>Excedente</dt>
-							<dd class="tabular font-extrabold">{money(current.surplus)}</dd>
-						</div>{/if}
-				</dl>
-			</div>
-
-			<!-- svelte-ignore a11y_no_noninteractive_tabindex (keyboard access to the horizontally scrollable table) -->
-			<div
-				class="hidden overflow-x-auto overscroll-x-contain focus-visible:outline-2 focus-visible:outline-primary sm:block"
-				role="region"
-				aria-label="Tabla de pagos por mes"
-				tabindex="0"
-			>
-				<table class="w-full border-collapse text-sm">
-					<caption class="sr-only"
-						>Préstamos, importes previstos y abonos por mes de {debtor.name}</caption
-					>
-					<thead
-						><tr class="bg-canvas text-xs text-muted"
-							><th scope="col" class="sticky left-0 z-10 min-w-44 bg-canvas px-4 py-4 text-left"
-								>Compra / préstamo</th
-							><th scope="col" class="min-w-32 px-4 py-4 text-right">Total</th
-							>{#each months as month (month)}<th
-									scope="col"
-									class="min-w-32 px-4 py-4 text-right capitalize {month === selectedMonth
-										? 'bg-primary-soft text-primary'
-										: ''}">{formatMonthShort(month)}</th
-								>{/each}</tr
-						></thead
-					>
-					<tbody>
-						{#each entries as entry, i (entry.id)}
-							{@const rest =
-								entry.amount - (entry.plan ?? []).reduce((sum, p) => sum + p.amount, 0)}
-							<tr class="border-t border-divider"
-								><th
-									scope="row"
-									class="sticky left-0 z-10 max-w-56 bg-surface px-4 py-3 text-left align-top"
-									><span class="block text-sm font-bold break-words"
-										>{entry.title || entry.note || `Préstamo ${i + 1}`}</span
-									>{#if rest > 0}<span class="mt-1 block text-[11px] font-medium text-muted"
-											>Sin repartir: {money(rest)}</span
-										>{/if}{#if onplan}<button
-											type="button"
-											class="mt-2 rounded-lg py-1 text-xs font-bold text-primary hover:underline"
-											aria-label={`Repartir ${entry.title || entry.note || `préstamo ${i + 1}`} por meses`}
-											onclick={() => onplan?.(entry)}
-											>{entry.plan?.length ? 'Editar reparto' : 'Repartir por meses'}</button
-										>{/if}</th
-								><td class="tabular px-4 py-3 text-right align-top font-bold"
-									>{money(entry.amount)}</td
-								>{#each months as month (month)}{@const amount = entry.plan?.find(
-										(p) => p.month === month
-									)?.amount}<td
-										class="tabular px-4 py-3 text-right align-top {month === selectedMonth
-											? 'bg-primary-soft/30'
-											: ''}">{amount ? money(amount) : '—'}</td
-									>{/each}</tr
-							>
-						{/each}
-					</tbody>
-					<tfoot>
-						{#each ['expected', 'paid', 'remaining', 'surplus'] as key (key)}
-							{#if key !== 'surplus' || summary.some((s) => s.surplus > 0)}
-								<tr
-									class="border-t border-divider font-bold {key === 'paid'
-										? 'bg-income-soft text-income-strong'
-										: key === 'remaining'
-											? 'bg-primary-soft text-primary'
-											: 'bg-canvas'}"
-									><th
-										scope="row"
-										class="sticky left-0 z-10 px-4 py-3 text-left {key === 'paid'
-											? 'bg-income-soft'
-											: key === 'remaining'
-												? 'bg-primary-soft'
-												: 'bg-canvas'}"
-										>{key === 'expected'
-											? 'Previsto'
-											: key === 'paid'
-												? 'Pagado'
-												: key === 'remaining'
-													? 'Faltante'
-													: 'Excedente'}</th
-									><td class="px-4 py-3 text-right">—</td
-									>{#each months as month (month)}{@const item = summary.find(
-											(s) => s.month === month
-										)}<td class="tabular px-4 py-3 text-right" data-month={month} data-total={key}
-											>{money(
-												item?.[key as 'expected' | 'paid' | 'remaining' | 'surplus'] ?? 0
-											)}</td
-										>{/each}</tr
-								>
-							{/if}
-						{/each}
-					</tfoot>
-				</table>
-			</div>
-		{:else}<EmptyState
-				icon={CalendarRange}
-				title="Todavía no hay préstamos para repartir"
-				text="Añade un préstamo y define cuánto corresponde pagar en cada mes."
-			/>{/if}
-	</Card>
-	<div class="mt-3 space-y-2 text-xs leading-relaxed text-muted">
-		<p>
-			Los abonos se descuentan del mes que eliges. Un excedente queda en ese mes y no se aplica a
-			otros automáticamente.
-		</p>
-		{#if unplanned > 0}<p>
-				<strong>{money(unplanned)}</strong> del total prestado aún no tiene un mes asignado.
-			</p>{/if}{#if unassigned > 0}<p class="rounded-xl bg-orange-soft p-3 text-orange-strong">
-				Hay {money(unassigned)} en abonos anteriores sin mes asignado. Ya reducen el saldo total; edítalos
-				en Movimientos para ubicarlos en esta tabla.
-			</p>{/if}{#if debtor.reference}<p>
-				Referencia anterior: {debtor.reference.date
-					? formatMonth(debtor.reference.date.slice(0, 7))
-					: 'sin mes'}{debtor.reference.amount !== null
-					? ` · ${money(debtor.reference.amount)}`
-					: ''}. Puedes usarla como guía al repartir los préstamos.
-			</p>{/if}
+		{/if}
 	</div>
+
+	{#if summary.length}
+		<!-- Resumen superior del plan si hay cuotas definidas -->
+		{#if plannedTotal > 0}
+			{@const totalPaid = summary.reduce((sum, s) => sum + s.paid, 0)}
+			<div class="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
+				<div class="rounded-2xl border border-outline bg-surface p-3 sm:p-4">
+					<p class="text-[11px] font-semibold text-muted">Total en cuotas</p>
+					<p class="tabular mt-1 text-sm font-extrabold sm:text-lg">{money(plannedTotal)}</p>
+				</div>
+				<div class="rounded-2xl border border-outline bg-surface p-3 sm:p-4">
+					<p class="text-[11px] font-semibold text-muted">Abonado acumulado</p>
+					<p class="tabular mt-1 text-sm font-extrabold text-income-strong sm:text-lg">{money(totalPaid)}</p>
+				</div>
+				<div class="col-span-2 rounded-2xl border border-outline bg-surface p-3 sm:col-span-1 sm:p-4">
+					<p class="text-[11px] font-semibold text-muted">Progreso del plan</p>
+					<p class="tabular mt-1 text-sm font-extrabold text-primary sm:text-lg">
+						{percentOf(totalPaid, plannedTotal)}% cubierto
+					</p>
+				</div>
+			</div>
+		{/if}
+
+		<!-- Tarjetas por mes -->
+		<div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+			{#each summary as item (item.month)}
+				{@const isCurrent = item.month === currentMonth}
+				{@const progress = item.expected > 0 ? Math.min(100, Math.round((item.paid / item.expected) * 100)) : 100}
+				<Card padding="none" class="flex flex-col justify-between overflow-hidden border border-outline transition-shadow hover:shadow-sm">
+					<div class="border-b border-divider bg-canvas/40 px-4 py-3">
+						<div class="flex items-center justify-between gap-2">
+							<div class="flex items-center gap-2">
+								<h3 class="text-sm font-extrabold capitalize">
+									{formatMonth(item.month)}
+								</h3>
+								{#if isCurrent}
+									<span class="rounded-md bg-primary-soft px-1.5 py-0.5 text-[10px] font-bold text-primary">
+										Este mes
+									</span>
+								{/if}
+							</div>
+
+							{#if item.status === 'completed'}
+								<Badge tone="income" icon={CheckCircle2}>
+									{item.surplus > 0 ? `+${money(item.surplus)}` : 'Cumplido'}
+								</Badge>
+							{:else if item.status === 'partial'}
+								<Badge tone="orange" icon={Clock}>
+									Falta {money(item.remaining)}
+								</Badge>
+							{:else if item.status === 'pending'}
+								<Badge tone="neutral">
+									Pendiente
+								</Badge>
+							{:else}
+								<Badge tone="primary">
+									Abono extra
+								</Badge>
+							{/if}
+						</div>
+					</div>
+
+					<div class="space-y-3 p-4">
+						<div class="grid grid-cols-2 gap-2 text-xs">
+							<div>
+								<span class="block text-muted">Acordado</span>
+								<span class="tabular font-extrabold text-foreground">
+									{item.expected > 0 ? money(item.expected) : '—'}
+								</span>
+							</div>
+							<div class="text-right">
+								<span class="block text-muted">Abonado</span>
+								<span class="tabular font-extrabold text-income-strong">
+									{item.paid > 0 ? money(item.paid) : 'S/ 0.00'}
+								</span>
+							</div>
+						</div>
+
+						{#if item.expected > 0}
+							<div>
+								<div class="mb-1 flex justify-between text-[11px] text-muted">
+									<span>Cumplimiento</span>
+									<span class="tabular font-bold">{progress}%</span>
+								</div>
+								<ProgressBar
+									value={progress}
+									tone={item.status === 'completed' ? 'income' : 'primary'}
+								/>
+							</div>
+						{/if}
+					</div>
+
+					{#if !readonly}
+						<div class="flex items-center justify-between border-t border-divider bg-canvas/20 px-3 py-2 text-xs">
+							<button
+								type="button"
+								class="inline-flex items-center gap-1 font-bold text-primary hover:underline"
+								onclick={() => oneditplan?.(item.month)}
+							>
+								<Pencil size={12} aria-hidden="true" />
+								<span>{item.expected > 0 ? 'Editar cuota' : 'Fijar cuota'}</span>
+							</button>
+
+							{#if item.expected > 0}
+								<IconButton
+									icon={Trash2}
+									variant="ghost"
+									size="sm"
+									label={`Eliminar cuota de ${formatMonth(item.month)}`}
+									onclick={() => removeMonth(item.month)}
+								/>
+							{/if}
+						</div>
+					{/if}
+				</Card>
+			{/each}
+		</div>
+	{:else}
+		<Card padding="none">
+			<EmptyState
+				icon={CalendarRange}
+				title="Aún no hay cuotas por mes"
+				text="Define cuánto acordaron pagar cada mes (por ejemplo, en octubre, noviembre...). Los abonos se registrarán directamente a ese mes sin complicaciones."
+			>
+				{#snippet action()}
+					{#if !readonly}
+						<Button icon={Plus} onclick={() => oneditplan?.()}>
+							Definir cuotas por mes
+						</Button>
+					{/if}
+				{/snippet}
+			</EmptyState>
+		</Card>
+	{/if}
+
+	{#if unassigned > 0}
+		<div class="mt-3 rounded-xl bg-orange-soft p-3 text-xs text-orange-strong">
+			Hay {money(unassigned)} en abonos antiguos sin mes especificado. Puedes editarlos para asignarlos al mes correspondiente.
+		</div>
+	{/if}
 </section>

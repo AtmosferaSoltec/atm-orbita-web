@@ -8,11 +8,8 @@ export function seedLoans(): Debtor[] {
 			currency: 'PEN',
 			amount: 300000,
 			date: '2026-08-01',
-			note: 'Celular',
-			plan: ['2026-08', '2026-09', '2026-10', '2026-11', '2026-12', '2027-01'].map((month) => ({
-				month,
-				amount: 50000
-			}))
+			title: 'Celular',
+			note: ''
 		},
 		{
 			id: 'g-b',
@@ -20,13 +17,8 @@ export function seedLoans(): Debtor[] {
 			currency: 'PEN',
 			amount: 200000,
 			date: '2026-09-03',
-			note: 'Laptop',
-			plan: [
-				{ month: '2026-09', amount: 50000 },
-				{ month: '2026-10', amount: 20000 },
-				{ month: '2026-11', amount: 65000 },
-				{ month: '2026-12', amount: 65000 }
-			]
+			title: 'Laptop',
+			note: ''
 		},
 		{
 			id: 'g-c',
@@ -34,12 +26,8 @@ export function seedLoans(): Debtor[] {
 			currency: 'PEN',
 			amount: 100000,
 			date: '2026-09-12',
-			note: 'Gastos personales',
-			plan: [
-				{ month: '2026-10', amount: 10000 },
-				{ month: '2026-11', amount: 45000 },
-				{ month: '2026-12', amount: 45000 }
-			]
+			title: 'Gastos personales',
+			note: ''
 		},
 		{
 			id: 'g-p1',
@@ -66,6 +54,14 @@ export function seedLoans(): Debtor[] {
 			name: 'Gerson',
 			currency: 'PEN',
 			movements,
+			plans: [
+				{ month: '2026-08', amount: 50000 },
+				{ month: '2026-09', amount: 100000 },
+				{ month: '2026-10', amount: 80000 },
+				{ month: '2026-11', amount: 160000 },
+				{ month: '2026-12', amount: 160000 },
+				{ month: '2027-01', amount: 50000 }
+			],
 			reference: null,
 			publicToken: 'demo-gerson',
 			createdAt: '2026-08-01T12:00:00Z'
@@ -81,7 +77,8 @@ export function seedLoans(): Debtor[] {
 					currency: 'USD',
 					amount: 120000,
 					date: '2026-06-20',
-					note: 'Laptop para trabajar'
+					title: 'Laptop para trabajar',
+					note: ''
 				},
 				{
 					id: 'd-p',
@@ -89,9 +86,11 @@ export function seedLoans(): Debtor[] {
 					currency: 'USD',
 					amount: 60000,
 					date: '2026-10-01',
-					note: 'Transferencia'
+					note: 'Transferencia',
+					appliedMonth: '2026-10'
 				}
 			],
+			plans: [],
 			reference: null,
 			publicToken: 'demo-diego',
 			createdAt: '2026-06-20T12:00:00Z'
@@ -101,9 +100,10 @@ export function seedLoans(): Debtor[] {
 			name: 'Rosa Huamán',
 			currency: 'PEN',
 			movements: [
-				{ id: 'r-a', kind: 'loan', currency: 'PEN', amount: 80000, date: '2026-01-08', note: '' },
-				{ id: 'r-p', kind: 'payment', currency: 'PEN', amount: 80000, date: '2026-05-08', note: '' }
+				{ id: 'r-a', kind: 'loan', currency: 'PEN', amount: 80000, date: '2026-01-08', title: 'Préstamo', note: '' },
+				{ id: 'r-p', kind: 'payment', currency: 'PEN', amount: 80000, date: '2026-05-08', note: '', appliedMonth: '2026-05' }
 			],
+			plans: [],
 			reference: null,
 			publicToken: 'demo-rosa',
 			createdAt: '2026-01-08T12:00:00Z'

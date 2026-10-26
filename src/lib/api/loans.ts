@@ -15,8 +15,8 @@ interface DebtorDto {
 		applied_month: string | null;
 		title: string;
 		note: string;
-		plan: { month: string; amount: string }[];
 	}[];
+	plans: { month: string; amount: string }[];
 }
 function fromDto(d: DebtorDto): Debtor {
 	return {
@@ -26,6 +26,7 @@ function fromDto(d: DebtorDto): Debtor {
 		publicToken: d.share_token ?? '',
 		reference: null,
 		createdAt: d.created_at,
+		plans: (d.plans ?? []).map((p) => ({ month: p.month, amount: parseAmount(p.amount) ?? 0 })),
 		movements: d.movements.map((m) => ({
 			id: m.id,
 			kind: m.kind,
@@ -34,8 +35,7 @@ function fromDto(d: DebtorDto): Debtor {
 			date: m.date,
 			appliedMonth: m.applied_month,
 			title: m.title,
-			note: m.note,
-			plan: m.plan.map((p) => ({ month: p.month, amount: parseAmount(p.amount) ?? 0 }))
+			note: m.note
 		}))
 	};
 }
@@ -49,8 +49,7 @@ function movementBody(d: MovementDraft) {
 		date: d.date,
 		applied_month: d.kind === 'payment' ? d.appliedMonth : null,
 		title: d.title ?? '',
-		note: d.note,
-		plan: d.kind === 'loan' ? planBody(d.plan ?? []) : []
+		note: d.note
 	};
 }
 export async function listDebtors(): Promise<{ items: Debtor[]; today: string }> {
@@ -86,15 +85,11 @@ export async function removeMovement(id: string, movementId: string): Promise<De
 		await api<DebtorDto>(`/loan-debtors/${id}/movements/${movementId}`, { method: 'DELETE' })
 	);
 }
-export async function setPlan(
-	id: string,
-	movementId: string,
-	plan: PlannedAmount[]
-): Promise<Debtor> {
+export async function setPlan(id: string, plans: PlannedAmount[]): Promise<Debtor> {
 	return fromDto(
-		await api<DebtorDto>(`/loan-debtors/${id}/movements/${movementId}/plan`, {
+		await api<DebtorDto>(`/loan-debtors/${id}/plans`, {
 			method: 'PUT',
-			body: { plan: planBody(plan) }
+			body: { plans: planBody(plans) }
 		})
 	);
 }

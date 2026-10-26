@@ -65,8 +65,7 @@
 				date,
 				note: note.trim(),
 				title: isPayment ? undefined : title.trim(),
-				appliedMonth: isPayment ? appliedMonth : undefined,
-				plan: isPayment ? undefined : editing?.plan
+				appliedMonth: isPayment ? appliedMonth : undefined
 			},
 			editing?.id,
 			requestId

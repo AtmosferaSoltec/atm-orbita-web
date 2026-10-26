@@ -15,7 +15,6 @@ export interface LoanMovement {
 	date: IsoDate;
 	note: string;
 	title?: string;
-	plan?: PlannedAmount[];
 	appliedMonth?: MonthKey | null;
 }
 export type MovementDraft = Omit<LoanMovement, 'id'>;
@@ -30,6 +29,7 @@ export interface Debtor {
 	name: string;
 	currency: Currency;
 	movements: LoanMovement[];
+	plans: PlannedAmount[];
 	reference: PaymentReference | null;
 	publicToken: string;
 	createdAt: string;
@@ -107,10 +107,6 @@ export function validateMovement(
 	if ((draft.title?.length ?? 0) > 100) return 'El concepto puede tener hasta 100 caracteres.';
 	if (draft.kind === 'payment' && (!draft.appliedMonth || !isLoanMonth(draft.appliedMonth)))
 		return 'Elige a qué mes corresponde el abono.';
-	if (draft.kind === 'loan') {
-		const planError = validatePlan(draft.amount, draft.plan ?? []);
-		if (planError) return planError;
-	}
 	if (draft.note.length > 500) return 'La nota puede tener hasta 500 caracteres.';
 	return validateLedger([
 		...debtor.movements.filter((m) => m.id !== editingId),
@@ -144,6 +140,7 @@ export function migrateLegacyLoans(records: LegacyLoan[]): Debtor[] {
 				currency: loan.currency,
 				name: loan.borrower.name.trim().replace(/\s+/g, ' '),
 				movements: [],
+				plans: [],
 				reference: null,
 				publicToken: loan.publicToken,
 				createdAt: loan.createdAt
@@ -186,6 +183,7 @@ export function migrateDebtorCurrencies(records: PreviousDebtor[]): Debtor[] {
 				index === 0 ? debtor.publicToken : `${debtor.publicToken}-${currency.toLowerCase()}`,
 			currency,
 			movements: debtor.movements.filter((m) => m.currency === currency),
+			plans: debtor.plans ?? [],
 			reference: debtor.reference?.currency === currency ? debtor.reference : null
 		}));
 	});
@@ -194,19 +192,15 @@ export function migrateDebtorCurrencies(records: PreviousDebtor[]): Debtor[] {
 export function isLoanMonth(month: string): boolean {
 	return /^\d{4}-(0[1-9]|1[0-2])$/.test(month) && month >= '2000-01' && month <= '2100-12';
 }
-export function validatePlan(principal: Cents, plan: PlannedAmount[]): string | null {
+export function validatePlan(plan: PlannedAmount[]): string | null {
 	const seen = new Set<MonthKey>();
-	let total = 0;
 	for (const item of plan) {
 		if (!isLoanMonth(item.month)) return 'Elige un mes y año válidos.';
-		if (seen.has(item.month)) return 'Cada mes puede aparecer una sola vez en este préstamo.';
+		if (seen.has(item.month)) return 'Cada mes puede aparecer una sola vez.';
 		if (!Number.isSafeInteger(item.amount) || item.amount <= 0)
 			return 'Cada monto mensual debe ser mayor que cero.';
 		seen.add(item.month);
-		total += item.amount;
 	}
-	if (!Number.isSafeInteger(total) || total > principal)
-		return 'El reparto no puede superar el total de este préstamo.';
 	return null;
 }
 export interface MonthlyLoanSummary {
@@ -215,6 +209,7 @@ export interface MonthlyLoanSummary {
 	paid: Cents;
 	remaining: Cents;
 	surplus: Cents;
+	status: 'completed' | 'partial' | 'pending' | 'extra';
 }
 export function monthlyLoanSummary(debtor: Debtor): MonthlyLoanSummary[] {
 	const months = new Map<MonthKey, { expected: Cents; paid: Cents }>();
@@ -226,27 +221,38 @@ export function monthlyLoanSummary(debtor: Debtor): MonthlyLoanSummary[] {
 		}
 		return item;
 	};
+	for (const target of debtor.plans ?? []) {
+		get(target.month).expected += target.amount;
+	}
 	for (const movement of debtor.movements) {
-		if (movement.kind === 'loan') {
-			for (const item of movement.plan ?? []) get(item.month).expected += item.amount;
-		} else if (movement.appliedMonth) get(movement.appliedMonth).paid += movement.amount;
+		if (movement.kind === 'payment' && movement.appliedMonth) {
+			get(movement.appliedMonth).paid += movement.amount;
+		}
 	}
 	return [...months]
 		.sort(([a], [b]) => a.localeCompare(b))
-		.map(([month, item]) => ({
-			month,
-			...item,
-			remaining: Math.max(0, item.expected - item.paid),
-			surplus: Math.max(0, item.paid - item.expected)
-		}));
+		.map(([month, item]) => {
+			const remaining = Math.max(0, item.expected - item.paid);
+			const surplus = Math.max(0, item.paid - item.expected);
+			let status: MonthlyLoanSummary['status'] = 'pending';
+			if (item.expected > 0) {
+				if (item.paid >= item.expected) status = 'completed';
+				else if (item.paid > 0) status = 'partial';
+				else status = 'pending';
+			} else {
+				status = 'extra';
+			}
+			return {
+				month,
+				...item,
+				remaining,
+				surplus,
+				status
+			};
+		});
 }
-export function unplannedAmount(debtor: Debtor): Cents {
-	return debtor.movements
-		.filter((m) => m.kind === 'loan')
-		.reduce(
-			(total, m) => total + m.amount - (m.plan ?? []).reduce((sum, p) => sum + p.amount, 0),
-			0
-		);
+export function totalPlanned(debtor: Debtor): Cents {
+	return (debtor.plans ?? []).reduce((sum, p) => sum + p.amount, 0);
 }
 export function unassignedPayments(debtor: Debtor): Cents {
 	return debtor.movements

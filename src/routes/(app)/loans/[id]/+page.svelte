@@ -17,7 +17,7 @@
 	import MovementList from '#lib/components/loans/MovementList.svelte';
 	import MovementModal from '#lib/components/loans/MovementModal.svelte';
 	import MonthlyPlan from '#lib/components/loans/MonthlyPlan.svelte';
-	import LoanPlanModal from '#lib/components/loans/LoanPlanModal.svelte';
+	import DebtorPlanModal from '#lib/components/loans/DebtorPlanModal.svelte';
 	import ShareLinkCard from '#lib/components/loans/ShareLinkCard.svelte';
 	import {
 		balancesOf,
@@ -41,7 +41,7 @@
 	);
 	let movementOpen = $state(false);
 	let planOpen = $state(false);
-	let planning = $state<LoanMovement | null>(null);
+	let selectedPlanMonth = $state<string | null>(null);
 	let kind = $state<MovementKind>('loan');
 	let editing = $state<LoanMovement | null>(null);
 	let deleteDebtor = $state(false);
@@ -98,8 +98,8 @@
 		>{/if}
 	<MonthlyPlan
 		{debtor}
-		onplan={(movement) => {
-			planning = movement;
+		oneditplan={(month) => {
+			selectedPlanMonth = month ?? null;
 			planOpen = true;
 		}}
 	/>
@@ -128,7 +128,7 @@
 		</aside>
 	</div>
 	<MovementModal bind:open={movementOpen} {debtor} {kind} {editing} />
-	<LoanPlanModal bind:open={planOpen} {debtor} movement={planning} />
+	<DebtorPlanModal bind:open={planOpen} {debtor} initialMonth={selectedPlanMonth} />
 	<ConfirmDialog
 		bind:open={deleteDebtor}
 		title="¿Eliminar deudor?"

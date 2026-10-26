@@ -131,14 +131,14 @@ class LoansStore {
 			return messageFor(failure);
 		}
 	}
-	async setPlan(id: string, movementId: string, plan: PlannedAmount[]): Promise<string | null> {
-		const movement = this.get(id)?.movements.find((m) => m.id === movementId && m.kind === 'loan');
-		if (!movement) return 'No se encontró el préstamo.';
-		const error = validatePlan(movement.amount, plan);
+	async setPlan(id: string, plans: PlannedAmount[]): Promise<string | null> {
+		const debtor = this.get(id);
+		if (!debtor) return 'No se encontró el deudor.';
+		const error = validatePlan(plans);
 		if (error) return error;
 		try {
 			await this.#run(
-				() => remote.setPlan(id, movementId, plan),
+				() => remote.setPlan(id, plans),
 				(d) => this.#put(d)
 			);
 			return null;

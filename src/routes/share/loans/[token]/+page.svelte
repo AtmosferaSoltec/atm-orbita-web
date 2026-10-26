@@ -72,7 +72,7 @@
 				</h2>
 				<LoanOverview {balance} borrowerView />
 			</section>{/each}
-		<MonthlyPlan {debtor} />
+		<MonthlyPlan {debtor} readonly={true} />
 
 		<Card padding="none"
 			><h2 class="border-b border-divider p-5 font-extrabold">Movimientos</h2>
