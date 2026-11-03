@@ -26,18 +26,27 @@ const MESSAGES: Record<string, string> = {
 		'Los abonos no pueden superar lo prestado en esa fecha. Actualiza la ficha y revisa los montos.',
 
 	SERVICE_CURRENCY_LOCKED: 'La moneda no se puede cambiar mientras existan pagos registrados.',
-	GOOGLE_UNAVAILABLE: 'El acceso con Google no está disponible en este momento.',
-	GOOGLE_ACCOUNT_NOT_LINKED:
-		'Ese Google no tiene una cuenta de Orbita. Si te registraste con correo y contraseña, usa esa opción.',
-	GOOGLE_INVALID: 'No pudimos verificar tu cuenta de Google. Vuelve a continuar con Google.',
-	GOOGLE_CHALLENGE_EXPIRED: 'El intento de acceso venció. Vuelve a continuar con Google.',
-	GOOGLE_LINK_REQUIRED: 'Confirma tu contraseña de Orbita para vincular Google.',
-	GOOGLE_IDENTITY_CONFLICT:
-		'Tu cuenta ya tiene otra cuenta de Google vinculada. Usa esa cuenta o ingresa con contraseña.',
+	// Auth API codes (lowercase snake_case).
+	google_unavailable: 'El acceso con Google no está disponible en este momento.',
+	google_challenge_expired: 'El intento de acceso venció. Vuelve a continuar con Google.',
+	google_not_linked:
+		'Ese Google no está vinculado a tu cuenta de Orbita. Si te registraste con correo y contraseña, usa esa opción.',
+	password_required_to_link: 'Confirma tu contraseña de Orbita para vincular Google.',
+	invalid_credentials: 'Correo o contraseña incorrectos.',
+	no_access: 'Tu cuenta no tiene acceso a Orbita.',
+	email_taken: 'Ese correo ya tiene una cuenta. Inicia sesión.',
+	signup_closed: 'El registro no está disponible por ahora.',
+	invalid_email: 'Escribe un correo válido.',
+	invalid_full_name: 'Escribe tu nombre (hasta 60 caracteres).',
+	weak_password: 'La contraseña debe tener entre 8 y 128 caracteres.',
+	reset_code_invalid: 'El código no es válido o ya venció. Pide uno nuevo.',
+	invalid_code_format: 'El código tiene 6 dígitos.',
+	invalid_refresh_token: 'Tu sesión terminó. Inicia sesión de nuevo.',
+	too_many_attempts: 'Demasiados intentos. Espera un momento.',
+	account_cleanup_failed:
+		'No pudimos borrar tus datos todavía. No se eliminó nada: inténtalo de nuevo.',
+	account_shared: 'Esta cuenta también se usa en otros sistemas y no se puede eliminar desde aquí.',
 
-	INVALID_CREDENTIALS: 'Correo o contraseña incorrectos.',
-	EMAIL_ALREADY_REGISTERED: 'Ese correo ya tiene una cuenta. Inicia sesión.',
-	RESET_CODE_INVALID: 'El código no es válido o ya venció. Pide uno nuevo.',
 	SESSION_EXPIRED: 'Tu sesión terminó. Inicia sesión de nuevo.',
 	UNAUTHORIZED: 'Tu sesión terminó. Inicia sesión de nuevo.',
 	TOO_MANY_REQUESTS: 'Demasiados intentos. Espera un momento.',

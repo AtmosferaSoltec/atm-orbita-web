@@ -2,26 +2,33 @@ import { expect, test as base, type Page } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
 
 const origin = 'http://localhost:4173';
+const authOrigin = process.env.AUTH_API_URL ?? 'https://auth.atmosferast.com/v1';
 
 const test = base.extend<{ account: { token: string; password: string } }>({
 	account: [
 		async ({ context }, use) => {
 			const password = `loans-${randomUUID()}`;
-			const response = await context.request.post(`${origin}/api/v1/auth/register`, {
-				headers: { 'X-Session-Transport': 'cookie' },
+			const response = await context.request.post(`${authOrigin}/register`, {
 				data: {
+					system: 'orbita',
 					email: `loans-ui-${randomUUID()}@e2e.orbita.test`,
 					password,
-					name: 'Loans QA',
-					timezone: 'America/Lima'
+					full_name: 'Loans QA'
 				}
 			});
 			expect(response.status()).toBe(201);
-			const token = (await response.json()).data.tokens.access_token as string;
+			const body = await response.json();
+			const token = body.access_token as string;
+			const refreshToken = body.refresh_token as string;
+			await context.addInitScript((refresh) => {
+				// Seeds the refresh token once; later renewals rotate it in the page.
+				if (!localStorage.getItem('orbita:refresh-token'))
+					localStorage.setItem('orbita:refresh-token', refresh);
+			}, refreshToken);
 			try {
 				await use({ token, password });
 			} finally {
-				const removed = await context.request.delete(`${origin}/api/v1/me`, {
+				const removed = await context.request.delete(`${authOrigin}/account`, {
 					headers: { Authorization: `Bearer ${token}` },
 					data: { password }
 				});

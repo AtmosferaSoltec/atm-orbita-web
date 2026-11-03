@@ -1,11 +1,14 @@
-import { api } from './client';
+import { PUBLIC_GOOGLE_CLIENT_ID } from '$app/env/public';
+import { authApi } from './client';
 
-export function googleConfig(): Promise<{ client_id: string }> {
-	return api('/auth/google/config', { auth: false });
+/** The Google OAuth web client ID (public). Empty = Google sign-in is hidden. */
+export function googleClientId(): string {
+	return PUBLIC_GOOGLE_CLIENT_ID;
 }
 
-export function googleChallenge(): Promise<{ nonce: string }> {
-	return api('/auth/google/challenge', { method: 'POST', body: {}, auth: false });
+/** A single-use nonce the auth API issues; Google must sign it into the ID token. */
+export async function googleChallenge(): Promise<{ nonce: string }> {
+	return authApi('/google/challenge', { method: 'POST', body: {} });
 }
 
 interface CredentialResponse {

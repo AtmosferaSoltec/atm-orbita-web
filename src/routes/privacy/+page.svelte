@@ -124,8 +124,8 @@
 					<strong
 						>No vendemos tus datos, no mostramos publicidad y no usamos herramientas de analítica ni
 						de seguimiento.</strong
-					> La web usa una sola cookie, necesaria para mantener tu sesión abierta (más una cookie temporal
-					cuando eliges entrar con Google).
+					> La web no usa cookies: guarda en tu navegador una clave de sesión, necesaria para mantener
+					tu sesión abierta.
 				</p>
 			</section>
 
@@ -177,8 +177,8 @@
 					<li>Todo viaja cifrado (HTTPS).</li>
 					<li>Tu contraseña se guarda con un cifrado irreversible.</li>
 					<li>
-						En la web, tu sesión usa una cookie que el código de la página no puede leer, lo que
-						reduce el riesgo de que te la roben.
+						En la web, tu sesión se renueva con una clave que cambia en cada uso, y si alguien
+						reutiliza una clave anterior la sesión se cierra.
 					</li>
 					<li>Cada persona solo puede ver sus propios datos.</li>
 					<li>Limitamos los intentos de acceso para frenar adivinanzas de contraseña.</li>

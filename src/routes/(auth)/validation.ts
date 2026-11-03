@@ -18,21 +18,3 @@ export function validateName(name: string): string | null {
 	if (name.trim().length > 60) return 'El nombre puede tener hasta 60 caracteres.';
 	return null;
 }
-
-// Region → currency, to preselect it like Android does with the phone's region.
-const REGION_CURRENCY: Record<string, string> = {
-	PE: 'PEN',
-	US: 'USD',
-	MX: 'MXN',
-	CO: 'COP',
-	CL: 'CLP',
-	AR: 'ARS',
-	BO: 'BOB',
-	ES: 'EUR'
-};
-
-export function regionCurrency(available: string[]): string {
-	const region = navigator.language.split('-')[1]?.toUpperCase() ?? '';
-	const currency = REGION_CURRENCY[region];
-	return currency && available.includes(currency) ? currency : 'PEN';
-}

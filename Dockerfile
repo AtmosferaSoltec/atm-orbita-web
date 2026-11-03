@@ -3,7 +3,7 @@
 # Production image of the web. It is built in GitHub Actions and published to
 # GHCR: the server never compiles. The web is a static SPA, so the runtime is
 # nginx serving the build (deploy/nginx.conf), which also forwards /api to the
-# API container.
+# Orbita API container (sign-in goes straight to the auth API).
 
 # ---- Build ----
 FROM node:24-alpine AS builder
@@ -12,6 +12,10 @@ WORKDIR /app
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
 RUN pnpm install --frozen-lockfile
 COPY . .
+# Public settings are baked into the static build (see .env.example).
+ARG PUBLIC_AUTH_API_URL
+ARG PUBLIC_GOOGLE_CLIENT_ID
+ENV PUBLIC_AUTH_API_URL=$PUBLIC_AUTH_API_URL PUBLIC_GOOGLE_CLIENT_ID=$PUBLIC_GOOGLE_CLIENT_ID
 RUN pnpm build
 
 # ---- Runtime ----

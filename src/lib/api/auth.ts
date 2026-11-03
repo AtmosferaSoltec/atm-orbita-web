@@ -1,6 +1,7 @@
-// Identity endpoints of the API: the same accounts as the Android app.
+// Identity: every call goes to the auth API (atm-auth-api); /me goes to the Orbita
+// API. The access token is an RS256 JWT, but the profile comes from GET /me.
 
-import { api, setAccessToken } from './client';
+import { api, authApi, clearSession, storedRefreshToken, storeTokens, type Tokens } from './client';
 
 export interface AccountUser {
 	id: string;
@@ -9,63 +10,60 @@ export interface AccountUser {
 	created_at: string;
 }
 
-export interface CurrencyOption {
-	code: string;
-	symbol: string;
-	name: string;
-}
-
-interface AuthPayload {
-	user: AccountUser;
-	tokens: { access_token: string; access_token_expires_in: number };
-}
-
 export interface RegisterInput {
 	name: string;
 	email: string;
 	password: string;
-	mainCurrency: string;
 }
 
-async function openSession(path: string, body: unknown): Promise<AccountUser> {
-	const data = await api<AuthPayload>(path, { method: 'POST', body, auth: false });
-	setAccessToken(data.tokens.access_token);
-	return data.user;
+const SYSTEM = 'orbita';
+
+/** Stores the tokens of a successful sign-in and loads the profile. */
+async function openSession(tokens: Tokens): Promise<AccountUser> {
+	storeTokens(tokens);
+	return me();
 }
 
-export function login(email: string, password: string): Promise<AccountUser> {
-	return openSession('/auth/login', { email, password });
+export async function login(email: string, password: string): Promise<AccountUser> {
+	const tokens = await authApi<Tokens>('/login', {
+		method: 'POST',
+		body: { system: SYSTEM, email, password }
+	});
+	return openSession(tokens);
 }
 
-export function loginWithGoogle(
+export async function loginWithGoogle(
 	credential: string,
-	mainCurrency: string,
-	password = ''
+	nonce: string,
+	password?: string
 ): Promise<AccountUser> {
-	return openSession('/auth/google', {
-		credential,
-		password,
-		main_currency: mainCurrency,
-		timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+	const tokens = await authApi<Tokens>('/google', {
+		method: 'POST',
+		body: { system: SYSTEM, credential, nonce, ...(password ? { password } : {}) }
 	});
+	return openSession(tokens);
 }
 
-export function register(input: RegisterInput): Promise<AccountUser> {
-	return openSession('/auth/register', {
-		name: input.name,
-		email: input.email,
-		password: input.password,
-		main_currency: input.mainCurrency,
-		// "Hoy" lo decide el API con la zona del perfil (como en Android).
-		timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+export async function register(input: RegisterInput): Promise<AccountUser> {
+	const tokens = await authApi<Tokens>('/register', {
+		method: 'POST',
+		body: {
+			system: SYSTEM,
+			email: input.email,
+			full_name: input.name,
+			password: input.password
+		}
 	});
+	return openSession(tokens);
 }
 
 export async function logout(): Promise<void> {
+	const refreshToken = storedRefreshToken();
 	try {
-		await api('/auth/logout', { method: 'POST', auth: false });
+		if (refreshToken)
+			await authApi('/logout', { method: 'POST', body: { refresh_token: refreshToken } });
 	} finally {
-		setAccessToken(null);
+		clearSession();
 	}
 }
 
@@ -73,36 +71,30 @@ export function me(): Promise<AccountUser> {
 	return api<AccountUser>('/me');
 }
 
-export function currencies(): Promise<CurrencyOption[]> {
-	return api<CurrencyOption[]>('/currencies', { auth: false });
-}
-
 export function forgotPassword(email: string): Promise<void> {
-	return api('/auth/forgot-password', { method: 'POST', body: { email }, auth: false });
+	return authApi('/password/forgot', { method: 'POST', body: { email, system: SYSTEM } });
 }
 
 export function verifyResetCode(email: string, code: string): Promise<void> {
-	return api('/auth/verify-reset-code', { method: 'POST', body: { email, code }, auth: false });
+	return authApi('/password/verify', { method: 'POST', body: { email, code } });
 }
 
 export function resetPassword(email: string, code: string, newPassword: string): Promise<void> {
-	return api('/auth/reset-password', {
+	return authApi('/password/reset', {
 		method: 'POST',
-		body: { email, code, new_password: newPassword },
-		auth: false
+		body: { email, code, new_password: newPassword, system: SYSTEM }
 	});
 }
 
-/** Deletes the account and all its data for good; the API asks for the password again. */
+/** Deletes the account and all its data for good; the auth API asks for the password again. */
 export function deleteAccount(password: string): Promise<void> {
-	return api('/me', { method: 'DELETE', body: { password } });
+	return authApi('/account', { method: 'DELETE', body: { password }, bearer: true });
 }
 
 /**
- * Deletes the account of whoever signed in with Google (no password to ask for).
- * It needs no session: the fresh Google credential proves who the person is, so it
- * also works for someone who uninstalled the app.
+ * Deletes the account of someone who signs in with Google (no password to ask for):
+ * a fresh Google credential and its challenge nonce prove who the person is.
  */
-export function deleteAccountWithGoogle(credential: string): Promise<void> {
-	return api('/auth/google/delete-account', { method: 'POST', body: { credential }, auth: false });
+export function deleteAccountWithGoogle(credential: string, nonce: string): Promise<void> {
+	return authApi('/account', { method: 'DELETE', body: { credential, nonce }, bearer: true });
 }

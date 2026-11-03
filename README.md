@@ -13,6 +13,6 @@ Sample XML to try the upload: `src/lib/domain/fixtures/rhe-sample.xml`.
 
 Conventions, structure and status: [CLAUDE.md](CLAUDE.md).
 
-Google sign-in uses the API's runtime configuration. The owner must configure an OAuth web client in Google Cloud and set `GOOGLE_WEB_CLIENT_ID` on the API; no web environment variable is required. Setup and deployment instructions: [Google sign-in plan](../atm-orbita-api/docs/plans/19-google-sign-in.md). Run `pnpm exec playwright test` for the simulated Google and multi-tab session flows.
+Authentication (login, register, refresh, logout, password recovery, Google, account deletion) goes to `atm-auth-api`; data goes to `atm-orbita-api` with the same Bearer access token. Configure it with the public env vars in `.env.example`: `PUBLIC_AUTH_API_URL` (default `https://auth.atmosferast.com/v1`) and `PUBLIC_GOOGLE_CLIENT_ID` (the Google OAuth web client ID; empty hides Google sign-in; the auth API must accept that client). Run `pnpm exec playwright test` for the simulated Google and multi-tab session flows.
 
-Services use the API and the server database through the existing SSH tunnel. No extra environment variables are needed. The services browser tests register temporary accounts, exercise real persistence and delete only their own test accounts afterwards. Details: [services plan](../atm-orbita-api/docs/plans/20-services.md).
+Services use the API and the server database through the existing SSH tunnel. The services and loans browser tests register temporary accounts in the auth API (`AUTH_API_URL`, default `https://auth.atmosferast.com/v1`), exercise real persistence and delete only their own test accounts afterwards. Details: [services plan](../atm-orbita-api/docs/plans/20-services.md).

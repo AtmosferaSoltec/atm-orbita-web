@@ -47,12 +47,16 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # No build-args: the web has no configuration, the same image runs anywhere.
+      # Public settings are baked into the static build; both are optional (repository
+      # variables). Without PUBLIC_AUTH_API_URL the default auth URL is used.
       - name: Build and push image
         uses: docker/build-push-action@v6
         with:
           context: .
           push: true
+          build-args: |
+            PUBLIC_AUTH_API_URL=${{ vars.PUBLIC_AUTH_API_URL }}
+            PUBLIC_GOOGLE_CLIENT_ID=${{ vars.PUBLIC_GOOGLE_CLIENT_ID }}
           tags: |
             ${{ env.IMAGE }}:latest
             ${{ env.IMAGE }}:sha-${{ github.sha }}

@@ -1,13 +1,14 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { googleChallenge, googleConfig, loadGoogleIdentity } from '#lib/api/google.ts';
+	import { googleChallenge, googleClientId, loadGoogleIdentity } from '#lib/api/google.ts';
 	import { isApiError, messageFor } from '#lib/api/errors.ts';
 	import { session } from '#lib/stores/session.svelte.ts';
 	import { Button, FormAlert } from '#lib/components/ui/index.ts';
 
 	// Confirms the deletion of an account that has no password by asking Google again.
-	// The credential comes with a single-use challenge the API issued (see the API's
-	// plan 21): it proves who the person is, so no session is needed.
+	// The credential comes with a single-use challenge nonce the auth API issued: it
+	// proves who the person is. DELETE /account needs a session, so without one the
+	// first Google confirmation signs in and the person confirms a second time.
 
 	interface Props {
 		/** The person has not yet checked "I understand": the button stays locked. */
@@ -23,7 +24,8 @@
 	let ready = $state(false);
 	let busy = $state(false);
 	let error = $state<string | null>(null);
-	let clientID = '';
+	const clientID = googleClientId();
+	let notice = $state<string | null>(null);
 	let active = false;
 
 	async function prepare() {
@@ -33,13 +35,14 @@
 			if (!active) return;
 			const challenge = await googleChallenge();
 			if (!active) return;
+			const nonce = challenge.nonce;
 			identity.initialize({
 				client_id: clientID,
-				nonce: challenge.nonce,
+				nonce,
 				auto_select: false,
 				ux_mode: 'popup',
 				callback: (response) => {
-					if (active && !busy) void remove(response.credential);
+					if (active && !busy) void remove(response.credential, nonce);
 				}
 			});
 			// Google owns the children of this otherwise empty integration container.
@@ -55,21 +58,31 @@
 			ready = true;
 		} catch (failure) {
 			if (active)
-				error = isApiError(failure, 'TOO_MANY_REQUESTS')
+				error = isApiError(failure, 'too_many_attempts')
 					? messageFor(failure)
 					: 'No se pudo cargar Google. Inténtalo de nuevo.';
 		}
 	}
 
-	async function remove(credential: string) {
+	async function remove(credential: string, nonce: string) {
 		busy = true;
 		error = null;
+		notice = null;
 		try {
-			await session.deleteAccountWithGoogle(credential);
+			if (!session.isSignedIn) {
+				await session.signInWithGoogle(credential, nonce);
+				if (!active) return;
+				notice = 'Verificamos tu cuenta. Confirma otra vez con Google para eliminarla.';
+				await prepare();
+				return;
+			}
+			await session.deleteAccountWithGoogle(credential, nonce);
 			if (active) ondeleted();
 		} catch (failure) {
 			if (!active) return;
-			error = messageFor(failure);
+			error = isApiError(failure, 'password_required_to_link')
+				? 'Esa cuenta tiene contraseña. Elige «Correo y contraseña» para eliminarla.'
+				: messageFor(failure);
 			await prepare();
 		} finally {
 			busy = false;
@@ -79,17 +92,9 @@
 	onMount(() => {
 		active = true;
 		void (async () => {
-			try {
-				const config = await googleConfig();
-				if (!active) return;
-				const available = Boolean(config.client_id);
-				onavailable?.(available);
-				if (!available) return;
-				clientID = config.client_id;
-				await prepare();
-			} catch {
-				onavailable?.(false);
-			}
+			onavailable?.(Boolean(clientID));
+			if (!clientID) return;
+			await prepare();
 		})();
 		return () => {
 			active = false;
@@ -108,6 +113,9 @@
 		<p role="status" class="text-center text-sm text-muted">Eliminando tu cuenta…</p>
 	{:else if !ready && !error}
 		<p role="status" class="text-center text-sm text-muted">Cargando Google…</p>
+	{/if}
+	{#if notice && !error}
+		<FormAlert tone="success" message={notice} />
 	{/if}
 	<FormAlert message={error} />
 	{#if error && !ready}

@@ -2,12 +2,11 @@
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import { googleChallenge, googleConfig, loadGoogleIdentity } from '#lib/api/google.ts';
+	import { googleChallenge, googleClientId, loadGoogleIdentity } from '#lib/api/google.ts';
 	import { isApiError, messageFor } from '#lib/api/errors.ts';
 	import { session } from '#lib/stores/session.svelte.ts';
 	import { Button, FormAlert, PasswordField } from '#lib/components/ui/index.ts';
 
-	let { mainCurrency = 'PEN' }: { mainCurrency?: string } = $props();
 	let container: HTMLDivElement;
 	let enabled = $state(false);
 	let ready = $state(false);
@@ -16,7 +15,8 @@
 	let password = $state('');
 	let error = $state<string | null>(null);
 	let credential = '';
-	let clientID = '';
+	let nonce = '';
+	const clientID = googleClientId();
 	let active = false;
 
 	async function prepare() {
@@ -26,6 +26,7 @@
 			if (!active) return;
 			const challenge = await googleChallenge();
 			if (!active) return;
+			nonce = challenge.nonce;
 			identity.initialize({
 				client_id: clientID,
 				nonce: challenge.nonce,
@@ -50,7 +51,7 @@
 			ready = true;
 		} catch (failure) {
 			if (active)
-				error = isApiError(failure, 'TOO_MANY_REQUESTS')
+				error = isApiError(failure, 'too_many_attempts')
 					? messageFor(failure)
 					: 'No se pudo cargar el acceso con Google. Inténtalo de nuevo.';
 		}
@@ -66,21 +67,18 @@
 		busy = true;
 		error = null;
 		try {
-			await session.signInWithGoogle(credential, mainCurrency, password);
+			await session.signInWithGoogle(credential, nonce, password || undefined);
 			credential = '';
 			password = '';
 			if (active) await goto(resolve('/(app)/dashboard'), { replaceState: true });
 		} catch (failure) {
 			if (!active) return;
-			if (isApiError(failure, 'GOOGLE_LINK_REQUIRED')) {
+			if (isApiError(failure, 'password_required_to_link')) {
 				linking = true;
 			} else {
 				error = messageFor(failure);
-				if (
-					!linking ||
-					isApiError(failure, 'GOOGLE_CHALLENGE_EXPIRED') ||
-					isApiError(failure, 'GOOGLE_INVALID')
-				) {
+				// A wrong password keeps the same credential and nonce; anything else restarts.
+				if (!linking || !isApiError(failure, 'invalid_credentials')) {
 					linking = false;
 					credential = '';
 					password = '';
@@ -103,19 +101,14 @@
 	onMount(() => {
 		active = true;
 		void (async () => {
-			try {
-				const config = await googleConfig();
-				if (!active || !config.client_id) return;
-				clientID = config.client_id;
-				enabled = true;
-				await prepare();
-			} catch {
-				// Email sign-in remains available if provider discovery is offline.
-			}
+			if (!clientID) return; // Google is not configured: email sign-in only.
+			enabled = true;
+			await prepare();
 		})();
 		return () => {
 			active = false;
 			credential = '';
+			nonce = '';
 			password = '';
 		};
 	});

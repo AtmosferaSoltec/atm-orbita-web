@@ -11,23 +11,23 @@ Plus: landing (`/`), login, register, forgot password (3 steps, like Android) an
 Public pages Google Play asks for (no session needed, linked from the landing, the sign-in screens and the user menu):
 
 - `/privacy`: the privacy policy. It states what the system really stores and which providers it uses (Cloudflare, Resend, Google), the 14-day retention of server logs and that there are no backups: **update it in the same change** that adds data, a provider, analytics or backups.
-- `/delete-account`: real, irreversible deletion of the account and its data. Email + password (signs in first if there is no session, and closes that session if it fails) or Google (`POST /auth/google/delete-account`, API plan 21: the fresh Google credential proves who the person is, so no session is needed). Contact for people who cannot sign in: `atmosfera.soltec@gmail.com`.
+- `/delete-account`: real, irreversible deletion of the account and its data through `DELETE /account` on atm-auth-api. Email + password (signs in first if there is no session, and closes that session if it fails) or Google (a fresh Google credential plus its challenge nonce; without a session the first Google confirmation signs in and the person confirms a second time). Contact for people who cannot sign in: `atmosfera.soltec@gmail.com`.
 
 ## Status (24 Oct 2026)
 
 | Part                              | State                                                                                                     |
 | --------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| Login, register, forgot password  | **Real**, against `atm-orbita-api` (the same accounts as the Android app; plans 01, 11 and 17 of the API) |
+| Login, register, forgot password  | **Real**, against `atm-auth-api` (`PUBLIC_AUTH_API_URL`); data stays on `atm-orbita-api`                  |
 | Receipts (`/receipts`)            | **Real**: data in the API's database, XML and PDF in Cloudflare R2 (API plan 18)                          |
 | Loans, services, public loan link | Loans/public loan links are **mockups** in localStorage; services are **real**, against the API (plan 20) |
 | Dashboard                         | Receipts and services real; loans from the mockups                                                        |
 
-- **Session:** the access token lives only in memory (`src/lib/api/client.ts`); the refresh token is an `HttpOnly`, `SameSite=Strict` cookie that JavaScript never sees (header `X-Session-Transport: cookie`, API plan 17). On load, the app renews the session and asks `/me` (`session.ensureReady()`); a 401 renews once and retries. New web sessions use 90-day renewable refresh tokens (API `WEB_REFRESH_TOKEN_TTL_DAYS`); existing/native sessions keep their policy. Web Locks serialize cookie rotations across tabs.
+- **Session:** the access token lives only in memory (`src/lib/api/client.ts`); the refresh token (JSON from atm-auth-api, it **rotates on every use**; reusing an old one ends the session) is stored in `localStorage`, or `sessionStorage` when the response says `session_mode: "temporary"`. There are no cookies. On load, the app renews the session at `POST /refresh` and asks `/me` on atm-orbita-api (`session.ensureReady()`); a 401 `UNAUTHORIZED` from the data API renews once and retries. Web Locks serialize rotations across tabs. Auth API errors use lowercase codes (`invalid_credentials`…); the Orbita API's are SCREAMING_SNAKE; `errors.ts` maps both.
 - **Loans:** mockup only; no loan API or database writes. Versioned localStorage key `orbita:loan-debtors-v3` preserves previous records from `orbita:loan-debtors-v2` (splitting mixed-currency people) and legacy `orbita:loans` (grouped by normalized name and currency), without deleting the original keys. Editing/removing movements validates the chronological balance for each currency. Monthly plans and applied payment months are optional additive fields for existing records. Previous repayments remain unassigned until manually edited, while already reducing the overall balance. Old day-based payment references are displayed only as a month-based historical hint; they never create a plan.
 - **Services:** real API persistence for subscriptions, members and monthly reimbursement payments (API plan 20). No categories or automatic equal split. Currency uses an animated radio switch and is locked after payments exist. Day/date controls use Bits UI popovers/calendar; date-only values use `@internationalized/date`. The store clears on session loss and uses the profile-local date from API metadata. Removing members/sharing also removes their payments. Historical payment amounts stay fixed.
 - **Files:** uploaded through the API (it checks them), downloaded with short-lived signed R2 URLs, and shown inside the page through `…/documents/:kind/content` (the R2 key cannot set CORS on the bucket; see API plan 18, deviations).
-- **Google sign-in:** login/register use Google Identity Services when the API returns a configured client ID from `/auth/google/config` (API plan 19). Google credentials stay in memory. An existing password account confirms its password once to link. The API supplies all provider configuration; no frontend `.env` or build arguments. Live account testing requires the owner’s OAuth web client ID. See `../atm-orbita-api/docs/plans/19-google-sign-in.md` for setup and deployment.
-- **Register asks for a name** (optional in the API, so Android keeps working without it).
+- **Google sign-in:** login/register use Google Identity Services with `PUBLIC_GOOGLE_CLIENT_ID` (no client ID = the button is hidden). The nonce from `POST /google/challenge` is passed to Google; credential and nonce stay in memory. `409 password_required_to_link` asks for the password of the existing account once and resends the same credential and nonce.
+- **Register asks for a name** (`full_name`). Main currency and timezone are not chosen on the web: atm-orbita-api creates the profile with PEN / America/Lima on the first request (the settings endpoints cannot change the main currency without an exchange rate).
 
 ## Running it locally
 
@@ -39,7 +39,7 @@ cd ../atm-orbita-api && scripts/dev.sh         # 2. API on http://localhost:3071
 pnpm dev                                       # 3. web on http://localhost:5173
 ```
 
-Vite proxies `/api` to the API (`API_PROXY_TARGET`, default `http://localhost:3071`), so the browser sees one origin: the session cookie is first-party and no CORS is needed. Migrations of the server database are applied from the API with `scripts/dev.sh migrate up`.
+Vite proxies `/api` to the Orbita API (`API_PROXY_TARGET`, default `http://localhost:3071`). Authentication calls go straight to `PUBLIC_AUTH_API_URL` (copy `.env.example` to `.env`; point it at a local atm-auth-api if you run one), so that API must allow the web origin through CORS. Migrations of the server database are applied from the API with `scripts/dev.sh migrate up`.
 
 ## Language rule (non-negotiable)
 
@@ -57,7 +57,7 @@ Vite proxies `/api` to the API (`API_PROXY_TARGET`, default `http://localhost:30
 ## Structure
 
 ```
-src/lib/api/          API client (client.ts: tokens, renewal, errors), auth.ts, receipts.ts; errors.ts maps codes to Spanish.
+src/lib/api/          API client (client.ts: tokens, renewal, errors; `api` = Orbita API, `authApi` = auth API), auth.ts, google.ts, receipts.ts; errors.ts maps codes to Spanish.
 src/lib/domain/       Pure rules (TS, no Svelte): money, dates, receipts, loans, services, rhe-xml. With tests (*.spec.ts).
 src/lib/data/         Mockup persistence (storage.ts) and sample data for loans (seed.ts).
 src/lib/stores/       State with runes (*.svelte.ts). session, receipts and services talk to the API; loans are mockups.
@@ -98,8 +98,8 @@ The workflow has three jobs: **check** (lint, types, tests, build), **build-and-
 On the server (`ssh atmosfera`):
 
 - `https://orbita.atmosferast.com` → host nginx (`/etc/nginx/sites-available/orbita.atmosferast.com`, wildcard origin certificate) → container `orbita-web` on `127.0.0.1:3070`.
-- The container is nginx serving the static build and forwarding `/api` to the `orbita-api` container over `atm-network` (`deploy/nginx.conf`). One origin: the session cookie is first-party and no CORS is needed.
-- `/opt/orbita-web` belongs to the `deploy` user. **There is no `.env`**: the web has no configuration or secrets.
+- The container is nginx serving the static build and forwarding `/api` to the `orbita-api` container over `atm-network` (`deploy/nginx.conf`). Sign-in calls go from the browser to the auth API.
+- `/opt/orbita-web` belongs to the `deploy` user. **There is no `.env` on the server**: `PUBLIC_AUTH_API_URL` and `PUBLIC_GOOGLE_CLIENT_ID` are baked in at image build (repository variables of the same names, passed as build args).
 - **The web needs the API deployed with the receipts module** (`atm-orbita-api`, plans 17 and 18); promote the API first.
 - Rollback: rerun the workflow (`workflow_dispatch`) on an older commit, or on the server `cd /opt/orbita-web && IMAGE_TAG=sha-<older> docker compose up -d`.
 

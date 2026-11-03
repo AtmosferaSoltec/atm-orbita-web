@@ -1,10 +1,11 @@
-// The signed-in person. The session survives reloads through the HttpOnly
-// refresh cookie: on start the app renews it and asks the API who it is.
+// The signed-in person. The session survives reloads through the refresh token kept
+// in browser storage: on start the app renews it with the auth API and asks the
+// Orbita API who it is.
 
 import { goto } from '$app/navigation';
 import { resolve } from '$app/paths';
 import * as auth from '#lib/api/auth.ts';
-import { refreshSession, setAccessToken, whenSessionLost } from '#lib/api/client.ts';
+import { clearSession, refreshSession, setAccessToken, whenSessionLost } from '#lib/api/client.ts';
 import { receipts } from './receipts.svelte';
 import { services } from './services.svelte';
 import { loans } from './loans.svelte';
@@ -48,8 +49,8 @@ class SessionStore {
 		this.user = await auth.login(email, password);
 	}
 
-	async signInWithGoogle(credential: string, mainCurrency: string, password = ''): Promise<void> {
-		this.user = await auth.loginWithGoogle(credential, mainCurrency, password);
+	async signInWithGoogle(credential: string, nonce: string, password?: string): Promise<void> {
+		this.user = await auth.loginWithGoogle(credential, nonce, password);
 	}
 
 	async register(input: auth.RegisterInput): Promise<void> {
@@ -84,9 +85,9 @@ class SessionStore {
 		this.#forget();
 	}
 
-	/** Deletes the account of a Google user; no session needed. */
-	async deleteAccountWithGoogle(credential: string): Promise<void> {
-		await auth.deleteAccountWithGoogle(credential);
+	/** Deletes the account of a Google user (needs a session: sign in with Google first). */
+	async deleteAccountWithGoogle(credential: string, nonce: string): Promise<void> {
+		await auth.deleteAccountWithGoogle(credential, nonce);
 		this.#forget();
 	}
 
@@ -99,7 +100,7 @@ class SessionStore {
 
 	/** Drops everything of the person from memory (the next one must not see it). */
 	#forget(): void {
-		setAccessToken(null);
+		clearSession();
 		this.user = null;
 		receipts.clear();
 		services.clear();

@@ -1,41 +1,18 @@
 <script lang="ts">
 	import GoogleSignIn from '#lib/components/auth/GoogleSignIn.svelte';
-	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { Mail, User } from '@lucide/svelte';
-	import {
-		Button,
-		FormAlert,
-		PasswordField,
-		SelectField,
-		TextField
-	} from '#lib/components/ui/index.ts';
-	import { currencies, type CurrencyOption } from '#lib/api/auth.ts';
+	import { Button, FormAlert, PasswordField, TextField } from '#lib/components/ui/index.ts';
 	import { messageFor } from '#lib/api/errors.ts';
 	import { session } from '#lib/stores/session.svelte.ts';
-	import { regionCurrency, validateEmail, validateName, validatePassword } from '../validation';
+	import { validateEmail, validateName, validatePassword } from '../validation';
 
-	// While the catalog loads (or if it fails) the two main currencies are enough.
-	let options = $state<CurrencyOption[]>([
-		{ code: 'PEN', symbol: 'S/', name: 'Soles' },
-		{ code: 'USD', symbol: 'US$', name: 'Dólares' }
-	]);
 	let name = $state('');
 	let email = $state('');
 	let password = $state('');
-	let currency = $state('PEN');
 	let error = $state<string | null>(null);
 	let loading = $state(false);
-
-	onMount(async () => {
-		try {
-			options = await currencies();
-		} catch {
-			// keep the fallback list
-		}
-		currency = regionCurrency(options.map((o) => o.code));
-	});
 
 	async function submit(event: SubmitEvent) {
 		event.preventDefault();
@@ -46,8 +23,7 @@
 			await session.register({
 				name: name.trim(),
 				email: email.trim(),
-				password,
-				mainCurrency: currency
+				password
 			});
 			await goto(resolve('/(app)/dashboard'), { replaceState: true });
 		} catch (failure) {
@@ -81,19 +57,13 @@
 		autocomplete="email"
 	/>
 	<PasswordField bind:value={password} autocomplete="new-password" hint="Mínimo 8 caracteres." />
-	<SelectField
-		label="Moneda"
-		bind:value={currency}
-		options={options.map((o) => ({ value: o.code, label: `${o.name} (${o.symbol})` }))}
-		hint="Es la moneda de tus cuentas en la app. Podrás cambiarla después en Ajustes."
-	/>
 
 	<FormAlert message={error} />
 
 	<Button type="submit" size="lg" block {loading}>Crear cuenta</Button>
 </form>
 
-<GoogleSignIn mainCurrency={currency} />
+<GoogleSignIn />
 
 <p class="mt-6 text-center text-sm text-muted">
 	¿Ya tienes cuenta?
