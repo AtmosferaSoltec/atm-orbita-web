@@ -87,11 +87,10 @@ src/routes/
 
 | Branch       | Purpose                                                                       |
 | ------------ | ----------------------------------------------------------------------------- |
-| `develop`    | All the work.                                                                 |
-| `main`       | What already works, promoted from `develop`.                                  |
+| `main`       | All the work. It is the default branch.                                       |
 | `production` | Pushing here runs `.github/workflows/deploy.yml` and publishes to the server. |
 
-The flow is always `develop` → `main` → `production`, and **promoting is the user's call**. The workflow refuses a commit that is not in `main`. Commits in Conventional Commits, in English, one per logical change.
+There are only these two branches: `develop` was removed on 4 Nov 2026 and is not created again. The flow is always `main` → `production`, and **promoting is the user's call**. Pushing to `main` deploys nothing; pushing to `production` does. Commits in Conventional Commits, in English, one per logical change.
 
 The workflow has three jobs: **check** (lint, types, tests, build), **build-and-push** (the image is built in GitHub and published to `ghcr.io/atmosferasoltec/atm-orbita-web`, never on the server) and **deploy** (copies `deploy/docker-compose.yml` to `/opt/orbita-web` and starts the new image, waiting for it to be `healthy`). It uses the repo secrets `SSH_HOST`, `SSH_USER` and `SSH_KEY`.
 
