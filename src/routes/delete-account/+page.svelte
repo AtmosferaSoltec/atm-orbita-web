@@ -21,7 +21,7 @@
 	// and data from the web, without the app and without being signed in first.
 	// Everything here is real and irreversible.
 
-	const CONTACT = 'atmosfera.soltec@gmail.com';
+	const CONTACT = 'soporte@atmosferast.com';
 
 	type Method = 'password' | 'google';
 

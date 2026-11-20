@@ -11,7 +11,7 @@ Plus: landing (`/`), login, register, forgot password (3 steps, like Android) an
 Public pages Google Play asks for (no session needed, linked from the landing, the sign-in screens and the user menu):
 
 - `/privacy`: the privacy policy. It states what the system really stores and which providers it uses (Cloudflare, Resend, Google), the 14-day retention of server logs and that there are no backups: **update it in the same change** that adds data, a provider, analytics or backups.
-- `/delete-account`: real, irreversible deletion of the account and its data through `DELETE /account` on atm-auth-api. Email + password (signs in first if there is no session, and closes that session if it fails) or Google (a fresh Google credential plus its challenge nonce; without a session the first Google confirmation signs in and the person confirms a second time). Contact for people who cannot sign in: `atmosfera.soltec@gmail.com`.
+- `/delete-account`: real, irreversible deletion of the account and its data through `DELETE /account` on atm-auth-api. Email + password (signs in first if there is no session, and closes that session if it fails) or Google (a fresh Google credential plus its challenge nonce; without a session the first Google confirmation signs in and the person confirms a second time). Contact for people who cannot sign in: `soporte@atmosferast.com`.
 
 ## Status (24 Oct 2026)
 

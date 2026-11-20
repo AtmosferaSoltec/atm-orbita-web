@@ -6,7 +6,7 @@
 	// the system really stores and uses; update it in the same change that changes that
 	// (a new provider, new data, backups…).
 
-	const CONTACT = 'atmosfera.soltec@gmail.com';
+	const CONTACT = 'soporte@atmosferast.com';
 	const UPDATED = '26 de octubre de 2026';
 
 	const SECTIONS = [
